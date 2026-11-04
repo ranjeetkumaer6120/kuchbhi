@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://kuchbhi.app/</loc>
+    <lastmod>2026-11-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://kuchbhi.app/assets/images/kuchbhi_icon.jpg</image:loc>
+      <image:title>kuchbhi - Apple Music Dark Aesthetic Free Music Player</image:title>
+      <image:caption>Master HD 320kbps offline and online music streaming player for Android and Car Display</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://kuchbhi.app/assets/images/app_screenshot.png</image:loc>
+      <image:title>kuchbhi App Interface Preview</image:title>
+      <image:caption>Live synchronized lyrics and Apple Music frosted glass interface</image:caption>
+    </image:image>
+  </url>
+</urlset>
