@@ -1,0 +1,54 @@
+# ===================================================================
+# kuchbhi Project — Git Ignore Rules
+# Covers Root Website + Subfolder Android Flutter App
+# ===================================================================
+
+# Operating System & Editor Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.bak
+*~
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Python & Local Server Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Flutter & Dart Build Artifacts (any subdirectory)
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+**/build/
+**/coverage/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Android Platform & Gradle Build Artifacts
+**/.gradle/
+**/local.properties
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/app.*.symbols
+**/app.*.map.json
+
+# iOS Platform Build Artifacts
+**/ios/Flutter/.last_build_id
+**/ios/Pods/
+**/.symlinks/
+
+# Root Temporary & Duplicate Binary Artifacts
+/kuchbhi-release.apk
+/soundvibe-applemusic.apk
+/kuchbhi.apk
+/kuchbhi-car-display.apk
+/image.png
+/.superpowers/

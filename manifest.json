@@ -1,0 +1,23 @@
+{
+  "name": "kuchbhi - Apple Music Master HD",
+  "short_name": "kuchbhi",
+  "description": "100% Free Master HD 320kbps music player with real-time synced lyrics, 24/7 Live Radio FM, and Car Android screen support.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0C",
+  "theme_color": "#FC3C44",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/images/kuchbhi_icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "music",
+    "entertainment",
+    "multimedia"
+  ]
+}
