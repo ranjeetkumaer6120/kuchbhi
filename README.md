@@ -13,7 +13,7 @@
   [![Tests](https://img.shields.io/badge/Tests-14%20Passed-brightgreen)](android_app/test/)
   [![Zero Ads](https://img.shields.io/badge/Ads-Zero%20Ads-red)](#features)
 
-  [Download APK](#-downloads) • [Live Showcase Website](https://kuchbhi.app/) • [Features](#-features) • [Build from Source](#-build-from-source) • [Car Stereo Setup](#-car-android-display-setup)
+  [Download APK](#-downloads) • [Live Web Demo](https://ranjeetkumaer6120.github.io/kuchbhi/) • [Features](#-features) • [Build from Source](#-build-from-source) • [Car Stereo Setup](#-car-android-display-setup)
 
 </div>
 
