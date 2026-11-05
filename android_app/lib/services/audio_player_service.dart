@@ -284,10 +284,15 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> _autoPopulateNextTracks() async {
-    final lang = _currentLanguageLock;
-    if (lang == null || lang.isEmpty) return;
+    final lang = (_currentLanguageLock != null && _currentLanguageLock!.isNotEmpty)
+        ? _currentLanguageLock!
+        : (_currentSong?.language.isNotEmpty == true ? _currentSong!.language : 'hindi');
+    final query = (_currentSong != null && _currentSong!.artist.isNotEmpty && _currentSong!.artist != 'Unknown')
+        ? _currentSong!.artist
+        : 'Trending $lang';
+
     try {
-      final suggestions = await _apiService.searchSongs('Trending $lang', language: lang);
+      final suggestions = await _apiService.searchSongs(query, language: lang);
       final freshTracks = suggestions.where((s) => !_queue.any((q) => q.id == s.id)).toList();
       if (freshTracks.isNotEmpty) {
         final startIndex = _queue.length;

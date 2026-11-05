@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/download_service.dart';
 import '../services/playlist_service.dart';
+import '../services/time_of_day_helper.dart';
 import '../theme/app_theme.dart';
 import '../widgets/language_filter_bar.dart';
 import '../widgets/song_tile_widget.dart';
@@ -171,6 +172,73 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
+              const SizedBox(height: 10),
+
+              // Time of Day Contextual Greeting Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      TimeOfDayHelper.getGreeting(),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.appleRed.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.appleRed.withValues(alpha: 0.3)),
+                      ),
+                      child: const Text(
+                        'LIVE FLOW',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.applePink,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+
+              // Curated Mood Pills Carousel
+              SizedBox(
+                height: 38,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: TimeOfDayHelper.getCuratedMoods().length,
+                  itemBuilder: (context, index) {
+                    final mood = TimeOfDayHelper.getCuratedMoods()[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ActionChip(
+                        label: Text(
+                          mood,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
+                        backgroundColor: AppTheme.surfaceLight,
+                        side: BorderSide(color: AppTheme.border.withValues(alpha: 0.8)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        onPressed: () {
+                          final cleanQuery = mood.replaceAll(RegExp(r'[^\w\s]'), '').trim();
+                          _loadCategorySongs(cleanQuery);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
               const SizedBox(height: 10),
 
               // Category Pills Carousel
