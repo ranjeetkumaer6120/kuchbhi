@@ -20,6 +20,8 @@ class AudioPlayerService extends ChangeNotifier {
   bool _isShuffle = false;
   LoopMode _loopMode = LoopMode.off;
   String? _currentLanguageLock;
+  double _playbackSpeed = 1.0;
+  bool _isLoFiMode = false;
 
   SongModel? get currentSong => _currentSong;
   List<SongModel> get queue => _queue;
@@ -31,10 +33,30 @@ class AudioPlayerService extends ChangeNotifier {
   bool get isShuffle => _isShuffle;
   bool get isLoop => _loopMode != LoopMode.off;
   String? get currentLanguageLock => _currentLanguageLock;
+  double get playbackSpeed => _playbackSpeed;
+  bool get isLoFiMode => _isLoFiMode;
 
   void setLanguageLock(String? language) {
     _currentLanguageLock = language?.trim().toLowerCase();
     notifyListeners();
+  }
+
+  Future<void> setSpeed(double speed) async {
+    _playbackSpeed = speed;
+    _isLoFiMode = (speed == 0.85);
+    try {
+      await _player.setSpeed(speed);
+      await _player.setPitch(speed);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> toggleLoFiMode() async {
+    if (_isLoFiMode) {
+      await setSpeed(1.0);
+    } else {
+      await setSpeed(0.85);
+    }
   }
 
   AudioPlayer get player => _player;

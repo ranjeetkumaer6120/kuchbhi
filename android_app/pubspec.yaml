@@ -44,6 +44,7 @@ dependencies:
   dart_des: ^1.0.2
   youtube_explode_dart: ^3.1.0
   just_audio_background: ^0.0.1-beta.17
+  share_plus: ^13.3.1
 
 dev_dependencies:
   flutter_test:

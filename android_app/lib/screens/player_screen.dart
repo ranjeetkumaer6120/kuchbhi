@@ -154,6 +154,105 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildLoFiButton(BuildContext context) {
+    return ListenableBuilder(
+      listenable: playerService,
+      builder: (context, _) {
+        final isLoFi = playerService.isLoFiMode;
+        final speed = playerService.playbackSpeed;
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            playerService.toggleLoFiMode();
+          },
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            _showSpeedSelectorModal(context);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isLoFi
+                  ? AppTheme.cyberCyan.withValues(alpha: 0.25)
+                  : Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isLoFi ? AppTheme.cyberCyan : Colors.transparent,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 16,
+                  color: isLoFi ? AppTheme.cyberCyan : Colors.white70,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isLoFi ? 'Lo-Fi 0.85x' : (speed != 1.0 ? '${speed}x' : 'Lo-Fi'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isLoFi ? FontWeight.bold : FontWeight.w600,
+                    color: isLoFi ? AppTheme.cyberCyan : Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSpeedSelectorModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final speeds = [0.75, 0.85, 1.0, 1.25, 1.5];
+        final labels = ['0.75x Slow', '0.85x Lo-Fi Slowed', '1.0x Normal', '1.25x Fast', '1.5x Speed Up'];
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Playback Speed & Lo-Fi Pitch',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 12),
+                ...List.generate(speeds.length, (i) {
+                  final s = speeds[i];
+                  final isSelected = (playerService.playbackSpeed == s);
+                  return ListTile(
+                    leading: Icon(
+                      s == 0.85 ? Icons.auto_awesome_rounded : Icons.speed_rounded,
+                      color: isSelected ? AppTheme.appleRed : Colors.white70,
+                    ),
+                    title: Text(labels[i], style: TextStyle(color: isSelected ? AppTheme.appleRed : Colors.white)),
+                    trailing: isSelected ? const Icon(Icons.check, color: AppTheme.appleRed) : null,
+                    onTap: () {
+                      playerService.setSpeed(s);
+                      Navigator.pop(ctx);
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSleepTimerButton(BuildContext context) {
     return ListenableBuilder(
       listenable: SleepTimerService.instance,
@@ -632,6 +731,9 @@ class PlayerScreen extends StatelessWidget {
                         label: const Text('Lyrics', style: TextStyle(fontWeight: FontWeight.w600)),
                         onPressed: () => _showLyricsModal(context, song),
                       ),
+
+                      // Lo-Fi Slowed & Speed Mode Button
+                      _buildLoFiButton(context),
 
                       if (isDownloading)
                         Row(
