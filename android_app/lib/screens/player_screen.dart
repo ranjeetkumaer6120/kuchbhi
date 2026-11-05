@@ -13,6 +13,7 @@ import '../services/sleep_timer_service.dart';
 import '../theme/album_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_favorite_button.dart';
+import '../widgets/audio_visualizer_widget.dart';
 
 class PlayerScreen extends StatelessWidget {
   final AudioPlayerService playerService;
@@ -564,6 +565,14 @@ class PlayerScreen extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
+
+                  // Live Harmonic Audio Soundwave Visualizer
+                  AudioVisualizerWidget(
+                    isPlaying: playerService.isPlaying,
+                    primaryColor: palette.primary,
+                    secondaryColor: palette.secondary,
+                  ),
+                  const SizedBox(height: 12),
 
                   // Title & Artist & Favorite Heart
                   Row(
