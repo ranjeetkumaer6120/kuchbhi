@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/song_model.dart';
 import '../services/audio_player_service.dart';
 import '../services/download_service.dart';
+import '../services/local_audio_service.dart';
 import '../services/playlist_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/song_tile_widget.dart';
@@ -10,13 +11,15 @@ class LibraryScreen extends StatefulWidget {
   final AudioPlayerService playerService;
   final DownloadService downloadService;
   final PlaylistService playlistService;
+  final LocalAudioService localAudioService;
 
-  const LibraryScreen({
+  LibraryScreen({
     super.key,
     required this.playerService,
     required this.downloadService,
     required this.playlistService,
-  });
+    LocalAudioService? localAudioService,
+  }) : localAudioService = localAudioService ?? LocalAudioService();
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -25,11 +28,13 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isOfflineOnlyMode = false;
+  String _deviceSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    widget.localAudioService.scanDeviceStorage();
   }
 
   @override
@@ -216,7 +221,11 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.downloadService, widget.playlistService]),
+      listenable: Listenable.merge([
+        widget.downloadService,
+        widget.playlistService,
+        widget.localAudioService,
+      ]),
       builder: (context, _) {
         final offlineSongs = widget.downloadService.offlineSongs;
         var favSongs = widget.playlistService.favorites;
@@ -224,6 +233,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
           favSongs = favSongs.where((s) => widget.downloadService.isDownloaded(s.id)).toList();
         }
         final folders = widget.playlistService.folderNames;
+        final deviceSongs = widget.localAudioService.songs;
 
         return Scaffold(
           appBar: AppBar(
@@ -282,6 +292,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                   icon: const Icon(Icons.folder_rounded, size: 18),
                   text: 'Folders (${folders.length})',
                 ),
+                Tab(
+                  icon: const Icon(Icons.phone_android_rounded, size: 18),
+                  text: 'Device (${deviceSongs.length})',
+                ),
               ],
             ),
           ),
@@ -320,6 +334,9 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
 
                     // Tab 3: Custom Folders / Playlists
                     _buildFoldersTab(folders),
+
+                    // Tab 4: Local Device Audio Files
+                    _buildDeviceMusicTab(deviceSongs),
                   ],
                 ),
               ),
@@ -679,6 +696,166 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildDeviceMusicTab(List<SongModel> deviceSongs) {
+    final filtered = _deviceSearchQuery.isEmpty
+        ? deviceSongs
+        : widget.localAudioService.search(_deviceSearchQuery);
+
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 120, top: 12),
+      children: [
+        // Device Search Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: TextField(
+            onChanged: (val) => setState(() => _deviceSearchQuery = val),
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Search device songs & audio files...',
+              hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textSecondary, size: 20),
+              suffixIcon: _deviceSearchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, color: AppTheme.textSecondary, size: 18),
+                      onPressed: () => setState(() => _deviceSearchQuery = ''),
+                    )
+                  : null,
+              filled: true,
+              fillColor: AppTheme.surfaceLight,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+
+        // Device Storage Scanner Banner
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.phone_android_rounded, color: AppTheme.cyberCyan, size: 24),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${deviceSongs.length} Local Tracks Found',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                      ),
+                      Text(
+                        widget.localAudioService.isScanning ? 'Scanning internal storage...' : 'Storage / SD Card Ready',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.cyberCyan),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: widget.localAudioService.isScanning
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.cyberCyan),
+                          )
+                        : const Icon(Icons.refresh_rounded, color: AppTheme.cyberCyan),
+                    tooltip: 'Rescan Storage',
+                    onPressed: widget.localAudioService.isScanning
+                        ? null
+                        : () => widget.localAudioService.scanDeviceStorage(),
+                  ),
+                  if (filtered.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.appleRed,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text('Play All', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        widget.playerService.playSong(filtered.first, playlist: filtered);
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        if (filtered.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.audio_file_rounded, size: 68, color: AppTheme.surfaceLight),
+                  const SizedBox(height: 16),
+                  Text(
+                    _deviceSearchQuery.isEmpty ? 'No Local Audio Files Found' : 'No Results for "$_deviceSearchQuery"',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Place .mp3, .m4a, or .flac files in your Music or Download folders, then tap Rescan.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.surfaceLight,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.sync_rounded),
+                    label: const Text('Scan Device Storage'),
+                    onPressed: () => widget.localAudioService.scanDeviceStorage(),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final song = filtered[index];
+              final isCurrent = widget.playerService.currentSong?.id == song.id;
+
+              return SongTileWidget(
+                song: song,
+                isPlaying: isCurrent && widget.playerService.isPlaying,
+                downloadService: widget.downloadService,
+                playlistService: widget.playlistService,
+                onTap: () => widget.playerService.playSong(song, playlist: filtered),
+              );
+            },
+          ),
       ],
     );
   }
