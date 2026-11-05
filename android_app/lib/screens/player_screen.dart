@@ -9,6 +9,8 @@ import '../services/api_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/download_service.dart';
 import '../services/playlist_service.dart';
+import '../services/sleep_timer_service.dart';
+import '../theme/album_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_favorite_button.dart';
 
@@ -152,6 +154,156 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildSleepTimerButton(BuildContext context) {
+    return ListenableBuilder(
+      listenable: SleepTimerService.instance,
+      builder: (context, _) {
+        final timer = SleepTimerService.instance;
+        final isActive = timer.isActive;
+        return IconButton(
+          icon: Icon(
+            isActive ? Icons.bedtime_rounded : Icons.bedtime_outlined,
+            size: 24,
+            color: isActive ? AppTheme.cyberCyan : Colors.white70,
+          ),
+          tooltip: 'Sleep Timer (${timer.formattedRemainingTime})',
+          onPressed: () => _showSleepTimerModal(context),
+        );
+      },
+    );
+  }
+
+  void _showSleepTimerModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return ListenableBuilder(
+          listenable: SleepTimerService.instance,
+          builder: (ctx, _) {
+            final timer = SleepTimerService.instance;
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.bedtime_rounded, color: AppTheme.cyberCyan, size: 24),
+                            SizedBox(width: 10),
+                            Text(
+                              'Sleep Timer',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (timer.isActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.cyberCyan.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              timer.formattedRemainingTime,
+                              style: const TextStyle(
+                                color: AppTheme.cyberCyan,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Audio will gently fade out over the last 10 seconds before pausing.',
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 12.5),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildTimerOption(context, ctx, '15 Minutes', const Duration(minutes: 15)),
+                    _buildTimerOption(context, ctx, '30 Minutes', const Duration(minutes: 30)),
+                    _buildTimerOption(context, ctx, '45 Minutes', const Duration(minutes: 45)),
+                    _buildTimerOption(context, ctx, '1 Hour', const Duration(minutes: 60)),
+                    ListTile(
+                      leading: const Icon(Icons.music_note_rounded, color: AppTheme.appleRed),
+                      title: const Text('End of Current Track', style: TextStyle(color: Colors.white)),
+                      trailing: timer.isEndOfSongMode
+                          ? const Icon(Icons.check_circle_rounded, color: AppTheme.cyberCyan)
+                          : null,
+                      onTap: () {
+                        timer.enableEndOfSongMode(
+                          onTimerComplete: () async => playerService.pause(),
+                        );
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Sleep timer set: Audio will pause at end of track'),
+                            backgroundColor: AppTheme.surfaceLight,
+                          ),
+                        );
+                      },
+                    ),
+                    if (timer.isActive) ...[
+                      const Divider(color: AppTheme.border),
+                      ListTile(
+                        leading: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent),
+                        title: const Text('Turn Off Timer', style: TextStyle(color: Colors.redAccent)),
+                        onTap: () {
+                          timer.cancelTimer();
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Sleep timer turned off'),
+                              backgroundColor: AppTheme.surfaceLight,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTimerOption(BuildContext screenContext, BuildContext sheetContext, String label, Duration duration) {
+    return ListTile(
+      leading: const Icon(Icons.timer_outlined, color: Colors.white70),
+      title: Text(label, style: const TextStyle(color: Colors.white)),
+      onTap: () {
+        SleepTimerService.instance.startTimer(
+          duration: duration,
+          onTimerComplete: () async => playerService.pause(),
+          onVolumeRamp: (vol) async => playerService.player.setVolume(vol),
+        );
+        Navigator.pop(sheetContext);
+        ScaffoldMessenger.of(screenContext).showSnackBar(
+          SnackBar(
+            content: Text('Sleep timer set for $label with smooth volume fade'),
+            backgroundColor: AppTheme.appleRed,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final song = playerService.currentSong;
@@ -162,6 +314,7 @@ class PlayerScreen extends StatelessWidget {
     final isDownloaded = downloadService.isDownloaded(song.id);
     final isDownloading = downloadService.downloadProgress.containsKey(song.id);
     final progress = downloadService.downloadProgress[song.id] ?? 0.0;
+    final palette = AlbumPalette.fromSong(title: song.title, artist: song.artist);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -181,6 +334,46 @@ class PlayerScreen extends StatelessWidget {
               filter: ImageFilter.blur(sigmaX: 55, sigmaY: 55),
               child: Container(
                 color: Colors.black.withValues(alpha: 0.65),
+              ),
+            ),
+          ),
+
+          // Dynamic Album Ambient Glow Mesh Blobs (Apple Music 2024 Aesthetic)
+          Positioned(
+            top: 40,
+            left: -40,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 800),
+              curve: Curves.easeInOutCubic,
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    palette.primary.withValues(alpha: 0.45),
+                    palette.primary.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 220,
+            right: -60,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 800),
+              curve: Curves.easeInOutCubic,
+              width: 340,
+              height: 340,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    palette.secondary.withValues(alpha: 0.40),
+                    palette.secondary.withValues(alpha: 0.0),
+                  ],
+                ),
               ),
             ),
           ),
@@ -207,9 +400,15 @@ class PlayerScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.more_horiz_rounded, size: 26, color: Colors.white),
-                        onPressed: () => _showAddToFolder(context, song),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSleepTimerButton(context),
+                          IconButton(
+                            icon: const Icon(Icons.more_horiz_rounded, size: 26, color: Colors.white),
+                            onPressed: () => _showAddToFolder(context, song),
+                          ),
+                        ],
                       ),
                     ],
                   ),

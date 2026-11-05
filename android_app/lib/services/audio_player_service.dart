@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import '../models/song_model.dart';
 import 'api_service.dart';
+import 'sleep_timer_service.dart';
 
 class AudioPlayerService extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
@@ -47,6 +48,10 @@ class AudioPlayerService extends ChangeNotifier {
       _isPlaying = state.playing;
       _isBuffering = state.processingState == ProcessingState.buffering;
       if (state.processingState == ProcessingState.completed) {
+        if (SleepTimerService.instance.isEndOfSongMode) {
+          SleepTimerService.instance.onSongCompleted();
+          return;
+        }
         if (_loopMode == LoopMode.all) {
           _player.seek(Duration.zero, index: 0);
         } else if (!_player.hasNext) {
@@ -224,6 +229,14 @@ class AudioPlayerService extends ChangeNotifier {
       _isBuffering = false;
       notifyListeners();
     }
+  }
+
+  Future<void> pause() async {
+    await _player.pause();
+  }
+
+  Future<void> play() async {
+    await _player.play();
   }
 
   Future<void> togglePlayPause() async {
