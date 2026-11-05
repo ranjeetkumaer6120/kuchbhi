@@ -14,6 +14,7 @@ import '../theme/album_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_favorite_button.dart';
 import '../widgets/audio_visualizer_widget.dart';
+import '../widgets/story_card_dialog.dart';
 
 class PlayerScreen extends StatelessWidget {
   final AudioPlayerService playerService;
@@ -55,6 +56,13 @@ class PlayerScreen extends StatelessWidget {
           apiService: apiService ?? ApiService(),
         );
       },
+    );
+  }
+
+  void _showStoryCardModal(BuildContext context, SongModel song) {
+    showDialog(
+      context: context,
+      builder: (ctx) => StoryCardDialog(song: song),
     );
   }
 
@@ -504,6 +512,11 @@ class PlayerScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           _buildSleepTimerButton(context),
+                          IconButton(
+                            icon: const Icon(Icons.ios_share_rounded, size: 22, color: Colors.white70),
+                            tooltip: 'Share Story Card',
+                            onPressed: () => _showStoryCardModal(context, song),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.more_horiz_rounded, size: 26, color: Colors.white),
                             onPressed: () => _showAddToFolder(context, song),
