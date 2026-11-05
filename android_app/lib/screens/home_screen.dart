@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<String> _categories = [
     '🔥 Trending',
-    '📻 Live Radio',
+    '⚡ Bollywood Hits',
     '☕ Lo-Fi Chill',
     'Bhojpuri Hits',
     'Pawan Singh',
@@ -81,12 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     List<SongModel> songs;
-    if (category.contains('Live Radio')) {
-      songs = await widget.apiService.getLiveRadioStations(query: 'bollywood', limit: 30);
-    } else if (category.contains('Lo-Fi Chill')) {
+    if (category.contains('Lo-Fi Chill')) {
       songs = await widget.apiService.getFreeToUseTracks(limit: 30);
     } else {
-      final query = category.replaceAll('🔥', '').trim();
+      final query = category.replaceAll('🔥', '').replaceAll('⚡', '').trim();
       songs = await widget.apiService.searchSongs(query, page: 1, limit: 25);
     }
 
@@ -94,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _trendingSongs = ApiService.deduplicateByQuality(songs);
         _isLoading = false;
-        if (songs.length < 20 || category.contains('Live Radio') || category.contains('Lo-Fi Chill')) {
+        if (songs.length < 20 || category.contains('Lo-Fi Chill')) {
           _hasMore = false;
         }
       });
@@ -104,14 +102,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadMoreSongs() async {
     if (_isLoadingMore || !_hasMore) return;
     final category = _categories[_selectedCategoryIndex];
-    if (category.contains('Live Radio') || category.contains('Lo-Fi Chill')) {
+    if (category.contains('Lo-Fi Chill')) {
       return;
     }
 
     setState(() => _isLoadingMore = true);
 
     _currentPage++;
-    final query = category.replaceAll('🔥', '').trim();
+    final query = category.replaceAll('🔥', '').replaceAll('⚡', '').trim();
     final moreSongs = await widget.apiService.searchSongs(query, page: _currentPage, limit: 25);
 
     if (mounted) {

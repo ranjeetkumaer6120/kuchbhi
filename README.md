@@ -46,7 +46,7 @@
 - **🚗 Car Android Display & Android Auto Ready**: Pre-configured `MediaBrowserService` and horizontal landscape optimization for car touchscreens.
 - **👆 Gesture Navigation**: Swipe left or right directly on the large album artwork with tactile haptic feedback to seamlessly switch tracks.
 - **⚡ Instant 0ms Favorite Reactivity**: Spring-pop animated heart button that updates UI immediately with optimistic local caching.
-- **📻 24/7 Live Radio FM**: Streaming stations across Bollywood, Punjabi, Retro, and International genres with automatic stream recovery.
+- **✨ Smart Quality Deduplication**: Multi-source aggregator automatically picks the highest bitrate 320kbps stream with zero duplicate tracks.
 - **🔒 Persistent Background Playback**: Foreground media service integration that never stops when your screen turns off or apps are minimized.
 - **💾 Offline MP3 Storage**: Downloaded songs stored locally with proper ID3 metadata, album art, and artist tags.
 

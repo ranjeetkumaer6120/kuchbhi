@@ -35,7 +35,6 @@ class _SearchScreenState extends State<SearchScreen> {
     '🌟 All Music',
     'Master HD',
     'Studio Audio',
-    '📻 Live Radio',
     '☕ Lo-Fi Chill',
     '🏛️ Classic Hits',
   ];
@@ -134,12 +133,9 @@ class _SearchScreenState extends State<SearchScreen> {
         results = await widget.apiService.searchYouTube(clean);
         break;
       case 3:
-        results = await widget.apiService.getLiveRadioStations(query: clean);
-        break;
-      case 4:
         results = await widget.apiService.getFreeToUseTracks();
         break;
-      case 5:
+      case 4:
         results = await widget.apiService.searchArchive(clean);
         break;
       default:

@@ -99,32 +99,6 @@ class ApiService {
     return [];
   }
 
-  /// Search / Fetch Live 24/7 FM Radio Stations (Radio Browser Public API)
-  Future<List<SongModel>> getLiveRadioStations({String query = 'bollywood', int limit = 30}) async {
-    try {
-      final tag = query.toLowerCase().replaceAll('🔥', '').trim();
-      final endpoint = tag.contains('india') || tag.contains('all')
-          ? 'https://all.api.radio-browser.info/json/stations/bycountry/india?limit=$limit'
-          : 'https://all.api.radio-browser.info/json/stations/bytag/${Uri.encodeComponent(tag.isNotEmpty ? tag : 'bollywood')}?limit=$limit';
-
-      final response = await http.get(Uri.parse(endpoint), headers: _headers).timeout(const Duration(seconds: 7));
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body) as List<dynamic>? ?? [];
-        final stations = <SongModel>[];
-        for (final item in decoded) {
-          try {
-            final song = SongModel.fromRadioJson(item as Map<String, dynamic>);
-            if (song.streamUrl.isNotEmpty) {
-              stations.add(song);
-            }
-          } catch (_) {}
-        }
-        return stations;
-      }
-    } catch (_) {}
-    return [];
-  }
-
   /// Search / Fetch Royalty-Free Lo-Fi & Chill Beats (FreeToUse Public API)
   Future<List<SongModel>> getFreeToUseTracks({int limit = 30}) async {
     try {
@@ -239,20 +213,16 @@ class ApiService {
     final results = await Future.wait([
       searchSongs(query),
       searchYouTube(query),
-      getLiveRadioStations(query: query, limit: 5),
     ]);
 
     final saavnList = results[0];
     final ytList = results[1];
-    final radioList = results[2];
 
     final combined = <SongModel>[];
     // Full 320kbps CD/Master quality tracks from JioSaavn
     combined.addAll(saavnList);
     // Full length ad-free audio streams from YouTube
     combined.addAll(ytList);
-    // Live 24/7 Radio stations matching search
-    combined.addAll(radioList);
 
     // Smart deduplication: keeps ONLY the highest quality track per song
     return deduplicateByQuality(combined);

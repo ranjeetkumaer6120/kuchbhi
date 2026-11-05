@@ -32,7 +32,6 @@ class SongModel {
   int get qualityScore {
     if (isOffline) return 400; // Offline downloads take highest priority
     if (qualityBadge.contains('320') || qualityBadge.contains('Master')) return 320; // Master Audio
-    if (source == 'radio' || qualityBadge.contains('LIVE')) return 280; // Live Radio stream
     if (qualityBadge.contains('256') || source == 'itunes' || qualityBadge.contains('Hi-Fi')) return 256; // Hi-Fi Audio
     if (source == 'youtube' || qualityBadge.contains('Studio')) return 192; // Studio HD audio
     if (source == 'archive') return 160;
@@ -134,24 +133,6 @@ class SongModel {
       artworkUrl: 'https://archive.org/services/img/$identifier',
       source: 'archive',
       qualityBadge: 'Classic HD',
-    );
-  }
-
-  /// Factory for Live Radio Stations (Radio Browser API)
-  factory SongModel.fromRadioJson(Map<String, dynamic> json) {
-    final name = cleanText(json['name']?.toString() ?? 'Live Radio');
-    final tags = (json['tags']?.toString() ?? 'Live FM').split(',').take(2).join(', ');
-
-    return SongModel(
-      id: 'radio_${json['stationuuid'] ?? DateTime.now().millisecondsSinceEpoch}',
-      title: name,
-      artist: 'Live Radio • ${tags.isNotEmpty ? tags : 'India'}',
-      album: 'Live Radio',
-      duration: 0, // Continuous live stream
-      streamUrl: json['url_resolved']?.toString() ?? json['url']?.toString() ?? '',
-      artworkUrl: json['favicon']?.toString() ?? '',
-      source: 'radio',
-      qualityBadge: 'LIVE FM',
     );
   }
 
