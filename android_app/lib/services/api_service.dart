@@ -21,7 +21,8 @@ class ApiService {
 
     try {
       String searchQuery = query.trim();
-      if (language != null && language.trim().isNotEmpty) {
+      final hasLang = language != null && language.trim().isNotEmpty && language.trim().toLowerCase() != 'all';
+      if (hasLang) {
         final lang = language.trim().toLowerCase();
         if (!searchQuery.toLowerCase().contains(lang)) {
           searchQuery = '$searchQuery $lang';
@@ -49,7 +50,7 @@ class ApiService {
         }
 
         var filtered = songs;
-        if (language != null && language.trim().isNotEmpty) {
+        if (hasLang) {
           final lang = language.trim().toLowerCase();
           final matching = songs.where((s) => s.language.toLowerCase() == lang).toList();
           if (matching.isNotEmpty) {
@@ -226,12 +227,17 @@ class ApiService {
 
   /// Multi-API Aggregator: Fetches 100% FULL LENGTH tracks from JioSaavn (320kbps Master)
   /// and YouTube HD, ensuring NO 30-second preview clips and NO duplicates are ever served.
-  Future<List<SongModel>> searchAllSourcesAndRank(String query) async {
+  Future<List<SongModel>> searchAllSourcesAndRank(String query, {String? language}) async {
     if (query.trim().isEmpty) return [];
 
+    final hasLang = language != null && language.trim().isNotEmpty && language.trim().toLowerCase() != 'all';
+    final ytQuery = (hasLang && !query.toLowerCase().contains(language.trim().toLowerCase()))
+        ? '$query ${language.trim().toLowerCase()}'
+        : query;
+
     final results = await Future.wait([
-      searchSongs(query),
-      searchYouTube(query),
+      searchSongs(query, language: language),
+      searchYouTube(ytQuery),
     ]);
 
     final saavnList = results[0];
@@ -244,7 +250,17 @@ class ApiService {
     combined.addAll(ytList);
 
     // Smart deduplication: keeps ONLY the highest quality track per song
-    return deduplicateByQuality(combined);
+    final deduped = deduplicateByQuality(combined);
+
+    if (hasLang) {
+      final lang = language.trim().toLowerCase();
+      final matching = deduped.where((s) => s.language.toLowerCase() == lang).toList();
+      if (matching.isNotEmpty) {
+        return matching;
+      }
+    }
+
+    return deduped;
   }
 
   /// Get Trending & Featured Indian / International tracks for Apple Music "Listen Now"
@@ -320,5 +336,106 @@ class ApiService {
     }
 
     return null;
+  }
+
+  /// Search Artists on JioSaavn
+  Future<List<Map<String, dynamic>>> searchArtists(String query) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      final uri = Uri.parse(
+        'https://www.jiosaavn.com/api.php?__call=search.getArtistResults&p=1&n=20&q=${Uri.encodeComponent(query)}&_format=json&_marker=0&api_version=4&ctx=android',
+      );
+      final response = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final results = decoded['results'] as List<dynamic>? ?? [];
+        return results.map((item) {
+          final map = item as Map<String, dynamic>;
+          String img = map['image']?.toString() ?? '';
+          img = img.replaceAll('50x50', '500x500').replaceAll('150x150', '500x500');
+          return {
+            'id': map['id']?.toString() ?? '',
+            'name': SongModel.cleanText(map['name']?.toString() ?? 'Artist'),
+            'image': img,
+            'role': map['role']?.toString() ?? 'Artist',
+          };
+        }).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Search Curated Playlists on JioSaavn
+  Future<List<Map<String, dynamic>>> searchPlaylists(String query) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      final uri = Uri.parse(
+        'https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&p=1&n=20&q=${Uri.encodeComponent(query)}&_format=json&_marker=0&api_version=4&ctx=android',
+      );
+      final response = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final results = decoded['results'] as List<dynamic>? ?? [];
+        return results.map((item) {
+          final map = item as Map<String, dynamic>;
+          String img = map['image']?.toString() ?? '';
+          img = img.replaceAll('150x150', '500x500');
+          return {
+            'id': map['id']?.toString() ?? '',
+            'title': SongModel.cleanText(map['title']?.toString() ?? 'Playlist'),
+            'image': img,
+            'songCount': map['more_info']?['song_count']?.toString() ?? '20+',
+          };
+        }).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Fetch full tracklist of a JioSaavn Playlist
+  Future<List<SongModel>> getPlaylistSongs(String playlistId) async {
+    try {
+      final uri = Uri.parse(
+        'https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid=${Uri.encodeComponent(playlistId)}&_format=json&_marker=0&api_version=4&ctx=android',
+      );
+      final response = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final list = decoded['list'] as List<dynamic>? ?? [];
+        final songs = <SongModel>[];
+        for (final item in list) {
+          try {
+            final song = SongModel.fromSaavnJson(item as Map<String, dynamic>);
+            if (song.streamUrl.isNotEmpty) songs.add(song);
+          } catch (_) {}
+        }
+        return deduplicateByQuality(songs);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Fetch Top Songs for an Artist on JioSaavn
+  Future<List<SongModel>> getArtistTopSongs(String artistId) async {
+    try {
+      final uri = Uri.parse(
+        'https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&artistId=${Uri.encodeComponent(artistId)}&_format=json&_marker=0&api_version=4&ctx=android',
+      );
+      final response = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final topSongsMap = decoded['topSongs'];
+        final songsList = (topSongsMap is Map ? topSongsMap['songs'] : topSongsMap) as List<dynamic>? ?? [];
+        final songs = <SongModel>[];
+        for (final item in songsList) {
+          try {
+            final song = SongModel.fromSaavnJson(item as Map<String, dynamic>);
+            if (song.streamUrl.isNotEmpty) songs.add(song);
+          } catch (_) {}
+        }
+        return deduplicateByQuality(songs);
+      }
+    } catch (_) {}
+    return [];
   }
 }

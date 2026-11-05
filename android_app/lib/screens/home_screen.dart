@@ -6,6 +6,7 @@ import '../services/audio_player_service.dart';
 import '../services/download_service.dart';
 import '../services/playlist_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/language_filter_bar.dart';
 import '../widgets/song_tile_widget.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -44,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   int _selectedCategoryIndex = 0;
+  String _selectedLanguage = 'All';
   List<SongModel> _trendingSongs = [];
   bool _isLoading = true;
   bool _isLoadingMore = false;
@@ -81,18 +83,19 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     List<SongModel> songs;
-    if (category.contains('Lo-Fi Chill')) {
+    if (category.contains('Lo-Fi Chill') && _selectedLanguage == 'All') {
       songs = await widget.apiService.getFreeToUseTracks(limit: 30);
     } else {
       final query = category.replaceAll('🔥', '').replaceAll('⚡', '').trim();
-      songs = await widget.apiService.searchSongs(query, page: 1, limit: 25);
+      final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
+      songs = await widget.apiService.searchSongs(query, page: 1, limit: 25, language: lang);
     }
 
     if (mounted) {
       setState(() {
         _trendingSongs = ApiService.deduplicateByQuality(songs);
         _isLoading = false;
-        if (songs.length < 20 || category.contains('Lo-Fi Chill')) {
+        if (songs.length < 20 || (category.contains('Lo-Fi Chill') && _selectedLanguage == 'All')) {
           _hasMore = false;
         }
       });
@@ -102,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadMoreSongs() async {
     if (_isLoadingMore || !_hasMore) return;
     final category = _categories[_selectedCategoryIndex];
-    if (category.contains('Lo-Fi Chill')) {
+    if (category.contains('Lo-Fi Chill') && _selectedLanguage == 'All') {
       return;
     }
 
@@ -110,7 +113,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _currentPage++;
     final query = category.replaceAll('🔥', '').replaceAll('⚡', '').trim();
-    final moreSongs = await widget.apiService.searchSongs(query, page: _currentPage, limit: 25);
+    final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
+    final moreSongs = await widget.apiService.searchSongs(query, page: _currentPage, limit: 25, language: lang);
 
     if (mounted) {
       setState(() {
@@ -153,6 +157,22 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Frosted Glass Language Filter Row
+              LanguageFilterBar(
+                selectedLanguage: _selectedLanguage,
+                onLanguageSelected: (lang) {
+                  if (_selectedLanguage != lang) {
+                    setState(() {
+                      _selectedLanguage = lang;
+                      _selectedCategoryIndex = 0;
+                    });
+                    _loadCategorySongs(_categories[0]);
+                  }
+                },
+              ),
+
+              const SizedBox(height: 10),
+
               // Category Pills Carousel
               SizedBox(
                 height: 44,

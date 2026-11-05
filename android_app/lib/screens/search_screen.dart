@@ -7,6 +7,7 @@ import '../services/audio_player_service.dart';
 import '../services/download_service.dart';
 import '../services/playlist_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/language_filter_bar.dart';
 import '../widgets/song_tile_widget.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -39,6 +40,7 @@ class _SearchScreenState extends State<SearchScreen> {
     '🏛️ Classic Hits',
   ];
   int _selectedSourceIndex = 0;
+  String _selectedLanguage = 'All';
 
   List<SongModel> _searchResults = [];
   bool _isSearching = false;
@@ -122,24 +124,32 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _isSearching = true);
     List<SongModel> results;
 
+    final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
+
     switch (_selectedSourceIndex) {
       case 0:
-        results = await widget.apiService.searchAllSourcesAndRank(clean);
+        results = await widget.apiService.searchAllSourcesAndRank(clean, language: lang);
         break;
       case 1:
-        results = await widget.apiService.searchSongs(clean);
+        results = await widget.apiService.searchSongs(clean, language: lang);
         break;
       case 2:
-        results = await widget.apiService.searchYouTube(clean);
+        final ytQuery = (lang != null && !clean.toLowerCase().contains(lang.toLowerCase()))
+            ? '$clean $lang'
+            : clean;
+        results = await widget.apiService.searchYouTube(ytQuery);
         break;
       case 3:
         results = await widget.apiService.getFreeToUseTracks();
         break;
       case 4:
-        results = await widget.apiService.searchArchive(clean);
+        final archiveQuery = (lang != null && !clean.toLowerCase().contains(lang.toLowerCase()))
+            ? '$clean $lang'
+            : clean;
+        results = await widget.apiService.searchArchive(archiveQuery);
         break;
       default:
-        results = await widget.apiService.searchAllSourcesAndRank(clean);
+        results = await widget.apiService.searchAllSourcesAndRank(clean, language: lang);
     }
 
     if (mounted) {
@@ -198,6 +208,21 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
+
+          // Frosted Glass Language Filter Bar
+          LanguageFilterBar(
+            selectedLanguage: _selectedLanguage,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            onLanguageSelected: (lang) {
+              if (_selectedLanguage != lang) {
+                setState(() => _selectedLanguage = lang);
+                if (_searchController.text.trim().isNotEmpty) {
+                  _performSearch(_searchController.text);
+                }
+              }
+            },
+          ),
+          const SizedBox(height: 8),
 
           // Multi-Source Selector Chips (Best Quality on Top)
           SizedBox(
