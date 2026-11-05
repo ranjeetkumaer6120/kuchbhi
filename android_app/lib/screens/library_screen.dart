@@ -493,6 +493,57 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
             ],
           ),
         ),
+
+        // Auto-Download Favorites Card
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.bolt_rounded, color: AppTheme.cyberCyan, size: 22),
+                  SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Auto-Download Favorites',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                      ),
+                      Text(
+                        'Save loved tracks offline automatically',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Switch(
+                value: widget.playlistService.autoDownloadFavorites,
+                activeThumbColor: AppTheme.cyberCyan,
+                onChanged: (val) {
+                  widget.playlistService.setAutoDownloadFavorites(val);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(val
+                          ? 'Auto-download enabled: Future favorites will be cached offline'
+                          : 'Auto-download disabled'),
+                      duration: const Duration(seconds: 2),
+                      backgroundColor: val ? AppTheme.cyberCyan : AppTheme.surfaceLight,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),

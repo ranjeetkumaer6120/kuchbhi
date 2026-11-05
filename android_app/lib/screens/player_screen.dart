@@ -615,7 +615,7 @@ class PlayerScreen extends StatelessWidget {
                             isFavorite: isFavorite,
                             size: 28,
                             inactiveColor: Colors.white70,
-                            onToggle: () => playlistService.toggleFavorite(song),
+                            onToggle: () => playlistService.toggleFavorite(song, downloadService: downloadService),
                           );
                         },
                       ),
