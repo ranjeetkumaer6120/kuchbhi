@@ -11,6 +11,7 @@ class SongModel {
   final String artworkUrl;
   final String source; // 'saavn', 'youtube', 'itunes', 'archive', 'offline'
   final String qualityBadge; // '320kbps HD', 'Apple 256k', 'YouTube HD', 'Archive MP3', 'Offline'
+  final String language; // e.g. 'hindi', 'bhojpuri', 'punjabi', 'english'
   bool isOffline;
   String? localFilePath;
 
@@ -24,6 +25,7 @@ class SongModel {
     required this.artworkUrl,
     this.source = 'saavn',
     this.qualityBadge = 'Master HD',
+    this.language = 'hindi',
     this.isOffline = false,
     this.localFilePath,
   });
@@ -87,6 +89,13 @@ class SongModel {
       dur = int.tryParse(moreInfo['duration'].toString()) ?? 0;
     }
 
+    String lang = 'hindi';
+    if (json['language'] != null && json['language'].toString().trim().isNotEmpty) {
+      lang = cleanText(json['language'].toString().toLowerCase());
+    } else if (moreInfo['language'] != null && moreInfo['language'].toString().trim().isNotEmpty) {
+      lang = cleanText(moreInfo['language'].toString().toLowerCase());
+    }
+
     return SongModel(
       id: json['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -97,6 +106,7 @@ class SongModel {
       artworkUrl: art,
       source: 'saavn',
       qualityBadge: 'Master HD',
+      language: lang,
     );
   }
 
@@ -104,6 +114,7 @@ class SongModel {
   factory SongModel.fromItunesJson(Map<String, dynamic> json) {
     final art = (json['artworkUrl100'] as String? ?? '').replaceAll('100x100bb', '600x600bb');
     final durMillis = (json['trackTimeMillis'] as num?)?.toInt() ?? 0;
+    final lang = (json['language'] as String?)?.toLowerCase() ?? 'english';
 
     return SongModel(
       id: 'itunes_${json['trackId'] ?? DateTime.now().millisecondsSinceEpoch}',
@@ -115,6 +126,7 @@ class SongModel {
       artworkUrl: art,
       source: 'itunes',
       qualityBadge: 'Hi-Fi Audio',
+      language: lang,
     );
   }
 
@@ -122,6 +134,7 @@ class SongModel {
   factory SongModel.fromArchiveJson(Map<String, dynamic> json) {
     final identifier = json['identifier'] as String? ?? '';
     final creator = json['creator'] is List ? (json['creator'] as List).join(', ') : (json['creator']?.toString() ?? 'Archive Community');
+    final lang = (json['language'] as String?)?.toLowerCase() ?? 'hindi';
 
     return SongModel(
       id: 'ia_$identifier',
@@ -133,6 +146,7 @@ class SongModel {
       artworkUrl: 'https://archive.org/services/img/$identifier',
       source: 'archive',
       qualityBadge: 'Classic HD',
+      language: lang,
     );
   }
 
@@ -157,6 +171,7 @@ class SongModel {
       artworkUrl: cover,
       source: 'freetouse',
       qualityBadge: 'Lo-Fi Chill',
+      language: 'english',
     );
   }
 
@@ -171,6 +186,7 @@ class SongModel {
       'artworkUrl': artworkUrl,
       'source': source,
       'qualityBadge': qualityBadge,
+      'language': language,
       'isOffline': isOffline,
       'localFilePath': localFilePath,
     };
@@ -187,6 +203,7 @@ class SongModel {
       artworkUrl: json['artworkUrl'] as String? ?? '',
       source: json['source'] as String? ?? 'offline',
       qualityBadge: json['qualityBadge'] as String? ?? '320kbps HD',
+      language: json['language'] as String? ?? 'hindi',
       isOffline: json['isOffline'] as bool? ?? false,
       localFilePath: json['localFilePath'] as String?,
     );

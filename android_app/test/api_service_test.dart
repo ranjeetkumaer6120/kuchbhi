@@ -1,9 +1,37 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundvibe/models/lyrics_model.dart';
 import 'package:soundvibe/models/song_model.dart';
 import 'package:soundvibe/services/api_service.dart';
+import 'package:soundvibe/services/audio_player_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    const channel = MethodChannel('com.ryanheise.just_audio.methods');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (MethodCall methodCall) async {
+        switch (methodCall.method) {
+          case 'init':
+            return {'id': methodCall.arguments['id']};
+          case 'load':
+            return {'duration': 120000000};
+          case 'disposeAllPlayers':
+            return <dynamic, dynamic>{};
+          default:
+            return <dynamic, dynamic>{};
+        }
+      },
+    );
+
+    const sessionChannel = MethodChannel('com.ryanheise.audio_session');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      sessionChannel,
+      (MethodCall methodCall) async => null,
+    );
+  });
   group('LyricsData Tests', () {
     test('LyricsData.parse parses synchronized LRC format accurately', () {
       const lrc = '''
@@ -42,6 +70,7 @@ Line three
         'title': 'Kesariya &amp; Love',
         'subtitle': 'Arijit Singh, Pritam',
         'image': 'https://c.saavncdn.com/871/Kesariya-From-Brahmastra-Hindi-2022-20220717092820-150x150.jpg',
+        'language': 'Hindi',
         'more_info': {
           'album': 'Brahmastra',
           'duration': '268',
@@ -54,13 +83,47 @@ Line three
       expect(song.artist, 'Arijit Singh, Pritam');
       expect(song.album, 'Brahmastra');
       expect(song.duration, 268);
+      expect(song.language, 'hindi');
       expect(song.artworkUrl, contains('500x500'));
       expect(song.streamUrl, contains('https://aac.saavncdn.com/'));
       expect(song.streamUrl, contains('_320.mp4'));
       expect(song.qualityBadge, 'Master HD');
     });
 
-    test('SongModel toJson and fromJson serialization works for offline catalog', () {
+    test('SongModel.fromSaavnJson parses language from json, more_info, and defaults to hindi', () {
+      // 1. Language from top-level json
+      final bhojpuriSample = {
+        'id': 'bhoj_1',
+        'title': 'Lollipop Lagelu',
+        'language': 'Bhojpuri',
+        'more_info': {'encrypted_media_url': 'ID2ieOjCrwfgWvL5sXl4B1ImC5QfbsDyryhkSYK5IH2E7FCO52VR6yhNbcEbes5iCcja4+W8xhE0SwtCJToN4Bw7tS9a8Gtq'},
+      };
+      final bhojpuriSong = SongModel.fromSaavnJson(bhojpuriSample);
+      expect(bhojpuriSong.language, 'bhojpuri');
+
+      // 2. Language from more_info
+      final englishSample = {
+        'id': 'eng_1',
+        'title': 'Shape of You',
+        'more_info': {
+          'language': 'English',
+          'encrypted_media_url': 'ID2ieOjCrwfgWvL5sXl4B1ImC5QfbsDyryhkSYK5IH2E7FCO52VR6yhNbcEbes5iCcja4+W8xhE0SwtCJToN4Bw7tS9a8Gtq',
+        },
+      };
+      final englishSong = SongModel.fromSaavnJson(englishSample);
+      expect(englishSong.language, 'english');
+
+      // 3. Defaults to hindi when omitted
+      final defaultSample = {
+        'id': 'def_1',
+        'title': 'Default Track',
+        'more_info': {'encrypted_media_url': 'ID2ieOjCrwfgWvL5sXl4B1ImC5QfbsDyryhkSYK5IH2E7FCO52VR6yhNbcEbes5iCcja4+W8xhE0SwtCJToN4Bw7tS9a8Gtq'},
+      };
+      final defaultSong = SongModel.fromSaavnJson(defaultSample);
+      expect(defaultSong.language, 'hindi');
+    });
+
+    test('SongModel toJson and fromJson serialization works for offline catalog and retains language', () {
       final original = SongModel(
         id: 'off_001',
         title: 'Chaleya',
@@ -69,16 +132,20 @@ Line three
         duration: 200,
         streamUrl: 'https://sample.com/audio.mp4',
         artworkUrl: 'https://sample.com/art.jpg',
+        language: 'hindi',
         isOffline: true,
         localFilePath: '/storage/music/chaleya.mp3',
       );
 
       final jsonMap = original.toJson();
+      expect(jsonMap['language'], 'hindi');
+
       final restored = SongModel.fromJson(jsonMap);
 
       expect(restored.id, original.id);
       expect(restored.title, original.title);
       expect(restored.artist, original.artist);
+      expect(restored.language, 'hindi');
       expect(restored.isOffline, true);
       expect(restored.localFilePath, '/storage/music/chaleya.mp3');
     });
@@ -157,6 +224,120 @@ Line three
     test('ApiService can be instantiated', () {
       final api = ApiService();
       expect(api, isNotNull);
+    });
+
+    test('ApiService.searchSongs accepts language parameter', () async {
+      final api = ApiService();
+      // Verifies method signature and execution with language parameter
+      final results = await api.searchSongs('', language: 'hindi');
+      expect(results, isEmpty);
+    });
+  });
+
+  group('AudioPlayerService Language Continuity Guard', () {
+    test('currentLanguageLock defaults to null and can be set', () {
+      final service = AudioPlayerService();
+      expect(service.currentLanguageLock, isNull);
+
+      service.setLanguageLock('bhojpuri');
+      expect(service.currentLanguageLock, 'bhojpuri');
+    });
+
+    test('playSong sets currentLanguageLock and filters mixed playlist to active language', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final service = AudioPlayerService();
+
+      final hindi1 = SongModel(
+        id: 'h_1',
+        title: 'Apna Bana Le',
+        artist: 'Arijit Singh',
+        album: 'Bhediya',
+        duration: 260,
+        streamUrl: 'https://saavn.com/h1.mp4',
+        artworkUrl: 'h1.jpg',
+        language: 'hindi',
+      );
+
+      final punjabi1 = SongModel(
+        id: 'p_1',
+        title: 'Trending Nakhra',
+        artist: 'Amrit Maan',
+        album: 'Single',
+        duration: 240,
+        streamUrl: 'https://saavn.com/p1.mp4',
+        artworkUrl: 'p1.jpg',
+        language: 'punjabi',
+      );
+
+      final hindi2 = SongModel(
+        id: 'h_2',
+        title: 'Kesariya',
+        artist: 'Arijit Singh',
+        album: 'Brahmastra',
+        duration: 268,
+        streamUrl: 'https://saavn.com/h2.mp4',
+        artworkUrl: 'h2.jpg',
+        language: 'hindi',
+      );
+
+      final telugu1 = SongModel(
+        id: 't_1',
+        title: 'Oo Antava',
+        artist: 'Indravathi Chauhan',
+        album: 'Pushpa',
+        duration: 220,
+        streamUrl: 'https://saavn.com/t1.mp4',
+        artworkUrl: 't1.jpg',
+        language: 'telugu',
+      );
+
+      final mixedTrendingPlaylist = [punjabi1, hindi1, telugu1, hindi2];
+
+      // User plays hindi1 from mixed trending playlist
+      await service.playSong(hindi1, playlist: mixedTrendingPlaylist);
+
+      expect(service.currentLanguageLock, 'hindi');
+      // Queue must preserve continuity: contain only the Hindi tracks
+      expect(service.queue.length, 2);
+      expect(service.queue.every((s) => s.language == 'hindi'), isTrue);
+      expect(service.queue[0].id, 'h_1');
+      expect(service.queue[1].id, 'h_2');
+    });
+
+    test('playSong falls back cleanly to full playlist if only 1 track matches language', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final service = AudioPlayerService();
+
+      final english1 = SongModel(
+        id: 'e_1',
+        title: 'Shape of You',
+        artist: 'Ed Sheeran',
+        album: 'Divide',
+        duration: 230,
+        streamUrl: 'https://sample.com/e1.mp4',
+        artworkUrl: 'e1.jpg',
+        language: 'english',
+      );
+
+      final hindi1 = SongModel(
+        id: 'h_1',
+        title: 'Kesariya',
+        artist: 'Arijit Singh',
+        album: 'Brahmastra',
+        duration: 268,
+        streamUrl: 'https://saavn.com/h1.mp4',
+        artworkUrl: 'h1.jpg',
+        language: 'hindi',
+      );
+
+      final mixedPlaylist = [english1, hindi1];
+
+      // User plays english1, which has no other english songs in playlist
+      await service.playSong(english1, playlist: mixedPlaylist);
+
+      expect(service.currentLanguageLock, 'english');
+      // Falls back to full playlist without crashing or discarding
+      expect(service.queue.length, 2);
     });
   });
 }

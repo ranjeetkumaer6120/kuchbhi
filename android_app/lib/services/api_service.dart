@@ -15,12 +15,21 @@ class ApiService {
 
   /// Search JioSaavn catalog with 320kbps direct audio streams (Rank 1: 320kbps)
   /// Supports infinite scroll pagination via [page] and [limit].
-  Future<List<SongModel>> searchSongs(String query, {int page = 1, int limit = 20}) async {
+  /// Optionally filters or scopes search to a specific [language] (e.g. 'hindi', 'bhojpuri', 'english').
+  Future<List<SongModel>> searchSongs(String query, {int page = 1, int limit = 20, String? language}) async {
     if (query.trim().isEmpty) return [];
 
     try {
+      String searchQuery = query.trim();
+      if (language != null && language.trim().isNotEmpty) {
+        final lang = language.trim().toLowerCase();
+        if (!searchQuery.toLowerCase().contains(lang)) {
+          searchQuery = '$searchQuery $lang';
+        }
+      }
+
       final uri = Uri.parse(
-        'https://www.jiosaavn.com/api.php?__call=search.getResults&p=$page&n=$limit&q=${Uri.encodeComponent(query)}&_format=json&_marker=0&api_version=4&ctx=android',
+        'https://www.jiosaavn.com/api.php?__call=search.getResults&p=$page&n=$limit&q=${Uri.encodeComponent(searchQuery)}&_format=json&_marker=0&api_version=4&ctx=android',
       );
 
       final response = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
@@ -38,7 +47,17 @@ class ApiService {
             }
           } catch (_) {}
         }
-        return deduplicateByQuality(songs);
+
+        var filtered = songs;
+        if (language != null && language.trim().isNotEmpty) {
+          final lang = language.trim().toLowerCase();
+          final matching = songs.where((s) => s.language.toLowerCase() == lang).toList();
+          if (matching.isNotEmpty) {
+            filtered = matching;
+          }
+        }
+
+        return deduplicateByQuality(filtered);
       }
     } catch (_) {}
     return [];
@@ -229,8 +248,8 @@ class ApiService {
   }
 
   /// Get Trending & Featured Indian / International tracks for Apple Music "Listen Now"
-  Future<List<SongModel>> getTrendingSongs({String category = 'Trending Hindi', int page = 1}) async {
-    return searchSongs(category, page: page);
+  Future<List<SongModel>> getTrendingSongs({String category = 'Trending Hindi', int page = 1, String? language}) async {
+    return searchSongs(category, page: page, language: language);
   }
 
   /// Extract direct raw googlevideo.com audio stream URL for a YouTube video

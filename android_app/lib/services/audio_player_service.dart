@@ -18,6 +18,7 @@ class AudioPlayerService extends ChangeNotifier {
   Duration _duration = Duration.zero;
   bool _isShuffle = false;
   LoopMode _loopMode = LoopMode.off;
+  String? _currentLanguageLock;
 
   SongModel? get currentSong => _currentSong;
   List<SongModel> get queue => _queue;
@@ -28,6 +29,12 @@ class AudioPlayerService extends ChangeNotifier {
   Duration get duration => _duration;
   bool get isShuffle => _isShuffle;
   bool get isLoop => _loopMode != LoopMode.off;
+  String? get currentLanguageLock => _currentLanguageLock;
+
+  void setLanguageLock(String? language) {
+    _currentLanguageLock = language?.trim().toLowerCase();
+    notifyListeners();
+  }
 
   AudioPlayer get player => _player;
 
@@ -42,6 +49,8 @@ class AudioPlayerService extends ChangeNotifier {
       if (state.processingState == ProcessingState.completed) {
         if (_loopMode == LoopMode.all) {
           _player.seek(Duration.zero, index: 0);
+        } else if (!_player.hasNext) {
+          _autoPopulateNextTracks();
         }
       }
       notifyListeners();
@@ -51,6 +60,9 @@ class AudioPlayerService extends ChangeNotifier {
       if (index != null && index >= 0 && index < _queue.length) {
         _currentIndex = index;
         _currentSong = _queue[index];
+        if (_currentSong != null) {
+          _currentLanguageLock = _currentSong!.language.toLowerCase().trim();
+        }
 
         // Resolve YouTube stream on demand if entering a track without pre-resolved URL
         if (_currentSong!.source == 'youtube' &&
@@ -67,6 +79,7 @@ class AudioPlayerService extends ChangeNotifier {
               artworkUrl: _currentSong!.artworkUrl,
               source: _currentSong!.source,
               qualityBadge: _currentSong!.qualityBadge,
+              language: _currentSong!.language,
               isOffline: _currentSong!.isOffline,
               localFilePath: _currentSong!.localFilePath,
             );
@@ -111,8 +124,21 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> playSong(SongModel song, {List<SongModel>? playlist}) async {
     try {
+      _currentLanguageLock = song.language.toLowerCase().trim();
+
       if (playlist != null && playlist.isNotEmpty) {
-        _queue = List.from(playlist);
+        // Enforce language continuity: if playlist contains mixed languages,
+        // filter/preserve tracks matching the active song's language so the queue
+        // maintains uninterrupted language continuity.
+        final activeLanguage = _currentLanguageLock!;
+        final matchingTracks = playlist.where((s) => s.language.toLowerCase().trim() == activeLanguage).toList();
+
+        if (matchingTracks.length > 1 && matchingTracks.any((s) => s.id == song.id)) {
+          _queue = matchingTracks;
+        } else {
+          _queue = List.from(playlist);
+        }
+
         _currentIndex = _queue.indexWhere((s) => s.id == song.id);
         if (_currentIndex == -1) {
           _queue.insert(0, song);
@@ -144,6 +170,7 @@ class AudioPlayerService extends ChangeNotifier {
             artworkUrl: song.artworkUrl,
             source: song.source,
             qualityBadge: song.qualityBadge,
+            language: song.language,
             isOffline: song.isOffline,
             localFilePath: song.localFilePath,
           );
@@ -151,7 +178,7 @@ class AudioPlayerService extends ChangeNotifier {
           _currentSong = song;
         }
       } else if (song.source == 'itunes' || song.streamUrl.contains('itunes.apple.com')) {
-        final fullSaavn = await _apiService.searchSongs('${song.title} ${song.artist}');
+        final fullSaavn = await _apiService.searchSongs('${song.title} ${song.artist}', language: song.language);
         if (fullSaavn.isNotEmpty && fullSaavn.first.streamUrl.isNotEmpty) {
           song = SongModel(
             id: song.id,
@@ -163,6 +190,7 @@ class AudioPlayerService extends ChangeNotifier {
             artworkUrl: song.artworkUrl,
             source: song.source,
             qualityBadge: song.qualityBadge,
+            language: song.language,
             isOffline: song.isOffline,
             localFilePath: song.localFilePath,
           );
@@ -215,7 +243,35 @@ class AudioPlayerService extends ChangeNotifier {
       await _player.seekToNext();
     } else if (_loopMode == LoopMode.all && _queue.isNotEmpty) {
       await _player.seek(Duration.zero, index: 0);
+    } else if (_currentLanguageLock != null && _currentLanguageLock!.isNotEmpty) {
+      await _autoPopulateNextTracks();
     }
+  }
+
+  Future<void> _autoPopulateNextTracks() async {
+    final lang = _currentLanguageLock;
+    if (lang == null || lang.isEmpty) return;
+    try {
+      final suggestions = await _apiService.searchSongs('Trending $lang', language: lang);
+      final freshTracks = suggestions.where((s) => !_queue.any((q) => q.id == s.id)).toList();
+      if (freshTracks.isNotEmpty) {
+        final startIndex = _queue.length;
+        _queue.addAll(freshTracks);
+        for (final track in freshTracks) {
+          final tag = _createMediaItem(track);
+          if (track.streamUrl.isNotEmpty) {
+            await _player.addAudioSource(
+              AudioSource.uri(Uri.parse(track.streamUrl), tag: tag),
+            );
+          }
+        }
+        notifyListeners();
+        if (_currentIndex < _queue.length - 1) {
+          await _player.seek(Duration.zero, index: startIndex);
+          await _player.play();
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> playPrevious() async {
