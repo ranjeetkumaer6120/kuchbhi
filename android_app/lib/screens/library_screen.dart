@@ -24,6 +24,7 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isOfflineOnlyMode = false;
 
   @override
   void initState() {
@@ -218,13 +219,44 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
       listenable: Listenable.merge([widget.downloadService, widget.playlistService]),
       builder: (context, _) {
         final offlineSongs = widget.downloadService.offlineSongs;
-        final favSongs = widget.playlistService.favorites;
+        var favSongs = widget.playlistService.favorites;
+        if (_isOfflineOnlyMode) {
+          favSongs = favSongs.where((s) => widget.downloadService.isDownloaded(s.id)).toList();
+        }
         final folders = widget.playlistService.folderNames;
 
         return Scaffold(
           appBar: AppBar(
             title: const Text('Library'),
             actions: [
+              // Offline Only Mode Switch
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isOfflineOnlyMode ? Icons.cloud_off_rounded : Icons.cloud_queue_rounded,
+                    size: 18,
+                    color: _isOfflineOnlyMode ? AppTheme.emeraldGreen : AppTheme.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Switch(
+                    value: _isOfflineOnlyMode,
+                    activeThumbColor: AppTheme.emeraldGreen,
+                    onChanged: (val) {
+                      setState(() => _isOfflineOnlyMode = val);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(val
+                              ? 'Offline Only Mode Enabled (Zero data usage)'
+                              : 'Online Mode Enabled (All tracks available)'),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: val ? AppTheme.emeraldGreen : AppTheme.surfaceLight,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
               IconButton(
                 icon: const Icon(Icons.create_new_folder_rounded, color: AppTheme.appleRed),
                 tooltip: 'Create New Folder',
@@ -253,17 +285,44 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
               ],
             ),
           ),
-          body: TabBarView(
-            controller: _tabController,
+          body: Column(
             children: [
-              // Tab 1: Offline Downloaded Songs
-              _buildOfflineTab(offlineSongs),
+              if (_isOfflineOnlyMode)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: AppTheme.emeraldGreen.withValues(alpha: 0.15),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.offline_pin_rounded, color: AppTheme.emeraldGreen, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Offline Mode Active • Playing strictly saved storage files',
+                        style: TextStyle(
+                          color: AppTheme.emeraldGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Tab 1: Offline Downloaded Songs
+                    _buildOfflineTab(offlineSongs),
 
-              // Tab 2: Favorites
-              _buildFavoritesTab(favSongs),
+                    // Tab 2: Favorites
+                    _buildFavoritesTab(favSongs),
 
-              // Tab 3: Custom Folders / Playlists
-              _buildFoldersTab(folders),
+                    // Tab 3: Custom Folders / Playlists
+                    _buildFoldersTab(folders),
+                  ],
+                ),
+              ),
             ],
           ),
         );
