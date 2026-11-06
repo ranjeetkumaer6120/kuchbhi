@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/download_service.dart';
 import '../services/playlist_service.dart';
+import '../services/user_taste_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/language_filter_bar.dart';
 import '../widgets/song_tile_widget.dart';
@@ -50,6 +51,9 @@ class _SearchScreenState extends State<SearchScreen> {
   List<SongModel> _searchResults = [];
   bool _isSearching = false;
 
+  List<SongModel> _trendingSongs = [];
+  bool _isLoadingTrending = false;
+
   List<String> _recentSearches = [];
 
   final List<String> _suggestions = [
@@ -69,6 +73,25 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _loadRecentSearches();
+    _loadTrendingSongs();
+  }
+
+  Future<void> _loadTrendingSongs() async {
+    if (!mounted) return;
+    setState(() => _isLoadingTrending = true);
+    try {
+      final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
+      final query = (lang != null && lang != 'All') ? '$lang Trending Hits' : 'Trending Hits';
+      final songs = await widget.apiService.searchSongs(query, page: 1, limit: 10, language: lang);
+      if (mounted) {
+        setState(() {
+          _trendingSongs = ApiService.deduplicateByQuality(songs);
+          _isLoadingTrending = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingTrending = false);
+    }
   }
 
   Future<void> _loadRecentSearches() async {
@@ -498,6 +521,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 setState(() => _selectedLanguage = lang);
                 if (_searchController.text.trim().isNotEmpty) {
                   _performSearch(_searchController.text);
+                } else {
+                  _loadTrendingSongs();
                 }
               }
             },
@@ -636,6 +661,126 @@ class _SearchScreenState extends State<SearchScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    // Section: Most Played by You (Jo Song Zyada Sunta Hai)
+                                    ListenableBuilder(
+                                      listenable: UserTasteService(),
+                                      builder: (context, _) {
+                                        final mostPlayed = UserTasteService().getMostPlayedSongs(limit: 6);
+                                        if (mostPlayed.isEmpty) return const SizedBox.shrink();
+
+                                        return Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Row(
+                                                  children: [
+                                                    Icon(Icons.repeat_rounded, color: AppTheme.appleRed, size: 20),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      'Most Played by You',
+                                                      style: TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: AppTheme.textPrimary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                TextButton.icon(
+                                                  icon: const Icon(Icons.play_arrow_rounded, size: 18, color: AppTheme.appleRed),
+                                                  label: const Text(
+                                                    'Play All',
+                                                    style: TextStyle(
+                                                      color: AppTheme.appleRed,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  onPressed: () {
+                                                    widget.playerService.playSong(mostPlayed.first, playlist: mostPlayed);
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            ...mostPlayed.map((song) {
+                                              final isCurrent = widget.playerService.currentSong?.id == song.id;
+                                              final playCount = UserTasteService().getPlayCount(song.id);
+                                              return SongTileWidget(
+                                                song: song,
+                                                isPlaying: isCurrent && widget.playerService.isPlaying,
+                                                downloadService: widget.downloadService,
+                                                playlistService: widget.playlistService,
+                                                subtitleExtra: '🔥 ${playCount}x',
+                                                onTap: () => widget.playerService.playSong(song, playlist: mostPlayed),
+                                              );
+                                            }),
+                                            const SizedBox(height: 24),
+                                          ],
+                                        );
+                                      },
+                                    ),
+
+                                    // Section: Live Trending Songs (Abhi Jo Trending Wala Hai)
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.trending_up_rounded, color: AppTheme.cyberCyan, size: 20),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              _selectedLanguage == 'All'
+                                                  ? 'Trending Now • Top Hits'
+                                                  : 'Trending in $_selectedLanguage',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.textPrimary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (_trendingSongs.isNotEmpty)
+                                          TextButton.icon(
+                                            icon: const Icon(Icons.play_arrow_rounded, size: 18, color: AppTheme.cyberCyan),
+                                            label: const Text(
+                                              'Play All',
+                                              style: TextStyle(
+                                                color: AppTheme.cyberCyan,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            onPressed: () {
+                                              widget.playerService.playSong(_trendingSongs.first, playlist: _trendingSongs);
+                                            },
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    if (_isLoadingTrending)
+                                      const Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 24),
+                                          child: CircularProgressIndicator(color: AppTheme.cyberCyan),
+                                        ),
+                                      )
+                                    else if (_trendingSongs.isNotEmpty)
+                                      ..._trendingSongs.take(8).map((song) {
+                                        final isCurrent = widget.playerService.currentSong?.id == song.id;
+                                        return SongTileWidget(
+                                          song: song,
+                                          isPlaying: isCurrent && widget.playerService.isPlaying,
+                                          downloadService: widget.downloadService,
+                                          playlistService: widget.playlistService,
+                                          onTap: () => widget.playerService.playSong(song, playlist: _trendingSongs),
+                                        );
+                                      }),
+                                    const SizedBox(height: 24),
+
                                     // Section: Recent Searches (if any)
                                     if (_recentSearches.isNotEmpty) ...[
                                       Row(

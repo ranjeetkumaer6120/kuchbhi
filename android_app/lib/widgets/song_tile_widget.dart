@@ -13,6 +13,7 @@ class SongTileWidget extends StatelessWidget {
   final VoidCallback onTap;
   final DownloadService downloadService;
   final PlaylistService? playlistService;
+  final String? subtitleExtra;
 
   const SongTileWidget({
     super.key,
@@ -21,6 +22,7 @@ class SongTileWidget extends StatelessWidget {
     required this.onTap,
     required this.downloadService,
     this.playlistService,
+    this.subtitleExtra,
   });
 
   void _showAddToFolderDialog(BuildContext context) {
@@ -234,6 +236,24 @@ class SongTileWidget extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
+                      if (subtitleExtra != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppTheme.appleRed.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            subtitleExtra!,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.applePink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Expanded(
                         child: Text(
                           song.artist,

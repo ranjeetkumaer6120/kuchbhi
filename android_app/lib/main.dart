@@ -9,6 +9,7 @@ import 'services/api_service.dart';
 import 'services/audio_player_service.dart';
 import 'services/download_service.dart';
 import 'services/playlist_service.dart';
+import 'services/user_taste_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/mini_player_widget.dart';
 
@@ -42,6 +43,8 @@ void main() async {
 
   final playlistService = PlaylistService();
   await playlistService.init();
+
+  await UserTasteService().init();
 
   final audioPlayerService = AudioPlayerService();
   final apiService = ApiService();

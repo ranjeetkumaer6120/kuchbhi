@@ -5,6 +5,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import '../models/song_model.dart';
 import 'api_service.dart';
 import 'sleep_timer_service.dart';
+import 'user_taste_service.dart';
 
 class AudioPlayerService extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
@@ -89,6 +90,7 @@ class AudioPlayerService extends ChangeNotifier {
         _currentSong = _queue[index];
         if (_currentSong != null) {
           _currentLanguageLock = _currentSong!.language.toLowerCase().trim();
+          UserTasteService().recordPlay(_currentSong!);
         }
 
         // Resolve YouTube stream on demand if entering a track without pre-resolved URL
@@ -181,6 +183,7 @@ class AudioPlayerService extends ChangeNotifier {
 
       _currentSong = song;
       _isBuffering = true;
+      UserTasteService().recordPlay(song);
       notifyListeners();
 
       // Resolve stream URL for current track if needed

@@ -15,38 +15,39 @@ class TimeOfDayHelper {
     }
   }
 
-  /// Returns 4-5 tailored music mood queries based on time of day
+  /// Returns tailored modern music mood queries based on time of day
+  /// (Strictly secular / musical; no devotional or rigid raga queries)
   static List<String> getCuratedMoods([DateTime? time]) {
     final now = time ?? DateTime.now();
     final hour = now.hour;
 
     if (hour >= 5 && hour < 12) {
       return [
-        '☕ Morning Ragas',
-        '🌸 Bhakti Hits',
-        '☀️ Acoustic Hindi',
-        '🧘 Peaceful Meditation',
+        '☕ Morning Acoustic',
+        '⚡ Fresh Hits',
+        '☀️ Hindi Vibes',
+        '🎧 Daily Mix',
       ];
     } else if (hour >= 12 && hour < 17) {
       return [
         '💻 Focus Lo-Fi',
         '☕ Coffee & Chill',
         '⚡ Bollywood Classics',
-        '📖 Study Instrumental',
+        '🎧 Chill Pop',
       ];
     } else if (hour >= 17 && hour < 22) {
       return [
         '🔥 Gym & Workout',
         '🥁 Punjabi Party',
         '🌾 Bhojpuri Beats',
-        '⚡ Trending 2024',
+        '⚡ Trending Hits',
       ];
     } else {
       return [
         '🌙 Midnight Romance',
-        '💔 Heartbreak Arijit',
+        '💔 Heartbreak Hits',
         '✨ Lo-Fi Slowed',
-        '🌌 Deep Sleep Ambient',
+        '🌌 Chill Acoustic',
       ];
     }
   }

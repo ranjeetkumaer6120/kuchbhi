@@ -7,7 +7,9 @@ void main() {
       final morningTime = DateTime(2026, 11, 5, 8, 30);
       expect(TimeOfDayHelper.getGreeting(morningTime), contains('Good Morning'));
       final moods = TimeOfDayHelper.getCuratedMoods(morningTime);
-      expect(moods, contains('☕ Morning Ragas'));
+      expect(moods, contains('☕ Morning Acoustic'));
+      expect(moods.any((m) => m.toLowerCase().contains('bhakti')), isFalse);
+      expect(moods.any((m) => m.toLowerCase().contains('raga')), isFalse);
     });
 
     test('returns Afternoon greeting and moods between 12 PM and 4:59 PM', () {
