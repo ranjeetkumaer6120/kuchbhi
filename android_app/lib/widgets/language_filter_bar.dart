@@ -15,12 +15,12 @@ class LanguageFilterBar extends StatelessWidget {
   });
 
   static const List<Map<String, String>> languages = [
-    {'label': '🔥 All', 'code': 'All'},
-    {'label': '🇮🇳 Hindi', 'code': 'Hindi'},
-    {'label': '🌾 Bhojpuri', 'code': 'Bhojpuri'},
-    {'label': '🌍 English', 'code': 'English'},
-    {'label': '🥁 Punjabi', 'code': 'Punjabi'},
-    {'label': '☕ Lo-Fi', 'code': 'Lo-Fi'},
+    {'label': 'All', 'code': 'All'},
+    {'label': 'Hindi', 'code': 'Hindi'},
+    {'label': 'Bhojpuri', 'code': 'Bhojpuri'},
+    {'label': 'English', 'code': 'English'},
+    {'label': 'Punjabi', 'code': 'Punjabi'},
+    {'label': 'Lo-Fi', 'code': 'Lo-Fi'},
   ];
 
   @override

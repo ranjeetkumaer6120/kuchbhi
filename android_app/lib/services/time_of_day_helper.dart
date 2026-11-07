@@ -1,53 +1,53 @@
 class TimeOfDayHelper {
-  /// Returns a contextual greeting with Apple Music style emoji
+  /// Returns a clean contextual greeting without emoji icons
   static String getGreeting([DateTime? time]) {
     final now = time ?? DateTime.now();
     final hour = now.hour;
 
     if (hour >= 5 && hour < 12) {
-      return 'Good Morning ☀️';
+      return 'Good Morning';
     } else if (hour >= 12 && hour < 17) {
-      return 'Good Afternoon ☕';
+      return 'Good Afternoon';
     } else if (hour >= 17 && hour < 22) {
-      return 'Good Evening 🌆';
+      return 'Good Evening';
     } else {
-      return 'Late Night Chill 🌙';
+      return 'Late Night Chill';
     }
   }
 
   /// Returns tailored modern music mood queries based on time of day
-  /// (Strictly secular / musical; no devotional or rigid raga queries)
+  /// Pure clean text without emoji icons
   static List<String> getCuratedMoods([DateTime? time]) {
     final now = time ?? DateTime.now();
     final hour = now.hour;
 
     if (hour >= 5 && hour < 12) {
       return [
-        '☕ Morning Acoustic',
-        '⚡ Fresh Hits',
-        '☀️ Hindi Vibes',
-        '🎧 Daily Mix',
+        'Morning Acoustic',
+        'Fresh Hits',
+        'Hindi Vibes',
+        'Daily Mix',
       ];
     } else if (hour >= 12 && hour < 17) {
       return [
-        '💻 Focus Lo-Fi',
-        '☕ Coffee & Chill',
-        '⚡ Bollywood Classics',
-        '🎧 Chill Pop',
+        'Focus Lo-Fi',
+        'Coffee & Chill',
+        'Bollywood Classics',
+        'Chill Pop',
       ];
     } else if (hour >= 17 && hour < 22) {
       return [
-        '🔥 Gym & Workout',
-        '🥁 Punjabi Party',
-        '🌾 Bhojpuri Beats',
-        '⚡ Trending Hits',
+        'Gym & Workout',
+        'Punjabi Party',
+        'Bhojpuri Beats',
+        'Trending Hits',
       ];
     } else {
       return [
-        '🌙 Midnight Romance',
-        '💔 Heartbreak Hits',
-        '✨ Lo-Fi Slowed',
-        '🌌 Chill Acoustic',
+        'Midnight Romance',
+        'Heartbreak Hits',
+        'Lo-Fi Slowed',
+        'Chill Acoustic',
       ];
     }
   }

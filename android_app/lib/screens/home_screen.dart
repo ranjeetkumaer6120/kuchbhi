@@ -33,9 +33,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
 
   final List<String> _categories = [
-    '🔥 Trending',
-    '⚡ Bollywood Hits',
-    '☕ Lo-Fi Chill',
+    'Trending for You',
+    'Bollywood Hits',
+    'Lo-Fi Chill',
     'Bhojpuri Hits',
     'Pawan Singh',
     'Khesari Lal',
@@ -87,8 +87,14 @@ class _HomeScreenState extends State<HomeScreen> {
     List<SongModel> songs;
     if (category.contains('Lo-Fi Chill') && _selectedLanguage == 'All') {
       songs = await widget.apiService.getFreeToUseTracks(limit: 30);
+    } else if (category.contains('Trending')) {
+      final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
+      final rawSongs = await widget.apiService.getTrendingSongs(language: lang);
+      final deduplicated = ApiService.deduplicateByQuality(rawSongs);
+      // Re-rank and filter according to user interest and taste profile
+      songs = UserTasteService().getPersonalizedTrending(deduplicated, limit: 30);
     } else {
-      final query = category.replaceAll('🔥', '').replaceAll('⚡', '').trim();
+      final query = category.trim();
       final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
       songs = await widget.apiService.searchSongs(query, page: 1, limit: 25, language: lang);
     }
@@ -114,9 +120,15 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoadingMore = true);
 
     _currentPage++;
-    final query = category.replaceAll('🔥', '').replaceAll('⚡', '').trim();
     final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
-    final moreSongs = await widget.apiService.searchSongs(query, page: _currentPage, limit: 25, language: lang);
+    List<SongModel> moreSongs;
+    if (category.contains('Trending')) {
+      final rawMore = await widget.apiService.getTrendingSongs(page: _currentPage, language: lang);
+      moreSongs = UserTasteService().getPersonalizedTrending(rawMore, limit: 25);
+    } else {
+      final query = category.trim();
+      moreSongs = await widget.apiService.searchSongs(query, page: _currentPage, limit: 25, language: lang);
+    }
 
     if (mounted) {
       setState(() {
@@ -227,7 +239,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemCount: tastePills.length,
                       itemBuilder: (context, index) {
                         final mood = tastePills[index];
-                        final isPersonalized = mood.startsWith('⭐') || mood.contains('On Repeat') || mood.contains('Favorites');
+                        final topArtists = UserTasteService().getTopArtists();
+                        final isPersonalized = mood == 'On Repeat' || mood == 'Favorites Mix' || topArtists.contains(mood);
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: ActionChip(
@@ -245,31 +258,29 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             onPressed: () {
-                              if (mood == '🔥 On Repeat') {
+                              if (mood == 'On Repeat') {
                                 final mostPlayed = UserTasteService().getMostPlayedSongs();
                                 if (mostPlayed.isNotEmpty) {
                                   widget.playerService.playSong(mostPlayed.first, playlist: mostPlayed);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Playing your most listened songs 🔥'),
+                                      content: Text('Playing your most listened songs'),
                                       backgroundColor: AppTheme.appleRed,
                                     ),
                                   );
                                   return;
                                 }
-                              } else if (mood.startsWith('⭐ ')) {
-                                final artistName = mood.replaceFirst('⭐ ', '').trim();
-                                _loadCategorySongs(artistName);
+                              } else if (topArtists.contains(mood)) {
+                                _loadCategorySongs(mood);
                                 return;
-                              } else if (mood == '❤️ Favorites Mix') {
+                              } else if (mood == 'Favorites Mix') {
                                 final favs = widget.playlistService.favorites;
                                 if (favs.isNotEmpty) {
                                   widget.playerService.playSong(favs.first, playlist: favs);
                                   return;
                                 }
                               }
-                              final cleanQuery = mood.replaceAll(RegExp(r'[^\w\s]'), '').trim();
-                              _loadCategorySongs(cleanQuery);
+                              _loadCategorySongs(mood);
                             },
                           ),
                         );
@@ -537,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
-                                                '🔥 ${playCount}x',
+                                                '$playCount plays',
                                                 style: const TextStyle(
                                                   fontSize: 9.5,
                                                   fontWeight: FontWeight.bold,
@@ -582,7 +593,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Top Tracks (${_categories[_selectedCategoryIndex]})',
+                      _selectedCategoryIndex == 0
+                          ? 'Trending for You'
+                          : 'Top Tracks (${_categories[_selectedCategoryIndex]})',
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                     ),
                     const Text('Master HD', style: TextStyle(fontSize: 12, color: AppTheme.emeraldGreen, fontWeight: FontWeight.bold)),

@@ -18,12 +18,12 @@ void main() {
         ),
       );
 
-      expect(find.text('🔥 All'), findsOneWidget);
-      expect(find.text('🇮🇳 Hindi'), findsOneWidget);
-      expect(find.text('🌾 Bhojpuri'), findsOneWidget);
-      expect(find.text('🌍 English'), findsOneWidget);
-      expect(find.text('🥁 Punjabi'), findsOneWidget);
-      expect(find.text('☕ Lo-Fi'), findsOneWidget);
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('Hindi'), findsOneWidget);
+      expect(find.text('Bhojpuri'), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
+      expect(find.text('Punjabi'), findsOneWidget);
+      expect(find.text('Lo-Fi'), findsOneWidget);
     });
 
     testWidgets('tapping language chip invokes onLanguageSelected callback', (tester) async {
@@ -47,13 +47,13 @@ void main() {
       );
 
       // Tap Bhojpuri
-      await tester.tap(find.text('🌾 Bhojpuri'));
+      await tester.tap(find.text('Bhojpuri'));
       await tester.pumpAndSettle();
 
       expect(selected, 'Bhojpuri');
 
       // Tap Punjabi
-      await tester.tap(find.text('🥁 Punjabi'));
+      await tester.tap(find.text('Punjabi'));
       await tester.pumpAndSettle();
 
       expect(selected, 'Punjabi');
@@ -63,7 +63,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap Lo-Fi
-      await tester.tap(find.text('☕ Lo-Fi'));
+      await tester.tap(find.text('Lo-Fi'));
       await tester.pumpAndSettle();
 
       expect(selected, 'Lo-Fi');
