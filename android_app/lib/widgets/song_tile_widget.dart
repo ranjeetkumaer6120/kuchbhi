@@ -294,7 +294,7 @@ class SongTileWidget extends StatelessWidget {
                   _showAddToFolderDialog(context);
                 } else if (val == 'copy') {
                   final shareLink = song.streamUrl.isNotEmpty ? song.streamUrl : 'kuchbhi app';
-                  final copyText = '🎵 ${song.title} - ${song.artist}\nQuality: ${song.qualityBadge}\nLink: $shareLink';
+                  final copyText = '${song.title} - ${song.artist}\nQuality: ${song.qualityBadge}\nLink: $shareLink';
                   Clipboard.setData(ClipboardData(text: copyText));
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

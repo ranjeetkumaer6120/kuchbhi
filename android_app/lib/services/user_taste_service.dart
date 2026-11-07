@@ -308,7 +308,7 @@ class UserTasteService extends ChangeNotifier {
   }
 
   /// Returns personalized mood pills based on user interest
-  /// STRICT ICON-FREE: Absolutely zero emoji icons (no 🔥, ⭐, ❤️, etc.)
+  /// STRICT ICON-FREE: Absolutely zero emoji icons
   List<String> getPersonalizedVibePills({List<SongModel>? favorites}) {
     final pills = <String>[];
     final mostPlayed = getMostPlayedSongs();

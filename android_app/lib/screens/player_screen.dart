@@ -32,7 +32,7 @@ class PlayerScreen extends StatelessWidget {
 
   void _copySongDetails(BuildContext context, SongModel song) {
     final shareLink = song.streamUrl.isNotEmpty ? song.streamUrl : 'kuchbhi app';
-    final copyText = '🎵 ${song.title} - ${song.artist}\nAlbum: ${song.album}\nQuality: ${song.qualityBadge}\nLink: $shareLink';
+    final copyText = '${song.title} - ${song.artist}\nAlbum: ${song.album}\nQuality: ${song.qualityBadge}\nLink: $shareLink';
     Clipboard.setData(ClipboardData(text: copyText));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

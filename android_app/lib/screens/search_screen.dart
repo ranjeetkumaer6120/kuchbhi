@@ -39,11 +39,11 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Map<String, dynamic>> _playlistResults = [];
 
   final List<String> _sourceModes = [
-    '🌟 All Music',
+    'All Music',
     'Master HD',
     'Studio Audio',
-    '☕ Lo-Fi Chill',
-    '🏛️ Classic Hits',
+    'Lo-Fi Chill',
+    'Classic Hits',
   ];
   int _selectedSourceIndex = 0;
   String _selectedLanguage = 'All';
@@ -94,9 +94,11 @@ class _SearchScreenState extends State<SearchScreen> {
       ]);
 
       if (mounted) {
+        final dedupeTrending = ApiService.deduplicateByQuality(results[0]);
+        final dedupeSuggested = ApiService.deduplicateByQuality(results[1]);
         setState(() {
-          _trendingSongs = ApiService.deduplicateByQuality(results[0]);
-          _suggestedSongs = ApiService.deduplicateByQuality(results[1]);
+          _trendingSongs = UserTasteService().getPersonalizedTrending(dedupeTrending, limit: 10);
+          _suggestedSongs = UserTasteService().getPersonalizedTrending(dedupeSuggested, limit: 10);
           _isLoadingTrending = false;
         });
       }
@@ -162,6 +164,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (clean.isEmpty) return;
 
     _saveRecentSearch(clean);
+    UserTasteService().recordSearch(clean);
     setState(() => _isSearching = true);
 
     final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
@@ -501,7 +504,7 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
 
-          // Search Section Switcher: [🎵 Songs] [🎤 Artists] [📑 Playlists]
+          // Search Section Switcher: [Songs] [Artists] [Playlists]
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Container(
@@ -514,9 +517,9 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               child: Row(
                 children: [
-                  _buildSectionTab(0, '🎵 Songs'),
-                  _buildSectionTab(1, '🎤 Artists'),
-                  _buildSectionTab(2, '📑 Playlists'),
+                  _buildSectionTab(0, 'Songs'),
+                  _buildSectionTab(1, 'Artists'),
+                  _buildSectionTab(2, 'Playlists'),
                 ],
               ),
             ),
@@ -724,7 +727,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                 isPlaying: isCurrent && widget.playerService.isPlaying,
                                                 downloadService: widget.downloadService,
                                                 playlistService: widget.playlistService,
-                                                subtitleExtra: '🔥 ${playCount}x',
+                                                subtitleExtra: '$playCount plays',
                                                 onTap: () => widget.playerService.playSong(song, playlist: mostPlayed),
                                               );
                                             }),

@@ -47,7 +47,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
         // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(file.path)],
-          text: '🎵 Listening to "${widget.song.title}" by ${widget.song.artist} on Kuchbhi App (320kbps Master HD)!',
+          text: 'Listening to "${widget.song.title}" by ${widget.song.artist} on Kuchbhi App (320kbps Master HD)!',
         );
       }
     } catch (_) {
@@ -60,7 +60,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
   void _fallbackShare() {
     // ignore: deprecated_member_use
     Share.share(
-      '🎵 Listening to "${widget.song.title}" by ${widget.song.artist} on Kuchbhi App (320kbps Master HD)!',
+      'Listening to "${widget.song.title}" by ${widget.song.artist} on Kuchbhi App (320kbps Master HD)!',
     );
   }
 
