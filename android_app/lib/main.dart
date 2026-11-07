@@ -47,7 +47,17 @@ void main() async {
   await UserTasteService().init();
 
   final audioPlayerService = AudioPlayerService();
+  final restored = await audioPlayerService.restorePlaybackSession(autoPreparePlayer: true);
+
   final apiService = ApiService();
+  if (!restored) {
+    // Arm player with trending hits so car displays & Bluetooth AVRCP immediately have playable tracks
+    apiService.searchSongs('Trending Hits', limit: 10).then((songs) {
+      if (songs.isNotEmpty) {
+        audioPlayerService.prefillInitialQueue(songs);
+      }
+    }).catchError((_) {});
+  }
 
   runApp(SoundVibeApp(
     audioPlayerService: audioPlayerService,
@@ -105,8 +115,29 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _currentTabIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      widget.playerService.saveCurrentPlaybackSession();
+    }
+  }
 
   void _openPlayerModal() {
     showModalBottomSheet(

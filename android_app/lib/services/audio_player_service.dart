@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song_model.dart';
 import 'api_service.dart';
 import 'sleep_timer_service.dart';
@@ -132,6 +134,10 @@ class AudioPlayerService extends ChangeNotifier {
     _player.positionStream.listen((pos) {
       _position = pos;
       notifyListeners();
+      // Periodically persist seek position every 5 seconds so on sudden minimize/kill, exact position is preserved
+      if (pos.inSeconds > 0 && pos.inSeconds % 5 == 0) {
+        saveCurrentPlaybackSession();
+      }
     });
 
     _player.durationStream.listen((dur) {
@@ -250,6 +256,7 @@ class AudioPlayerService extends ChangeNotifier {
       );
 
       await _player.play();
+      await saveCurrentPlaybackSession();
     } catch (e) {
       _isBuffering = false;
       notifyListeners();
@@ -258,6 +265,7 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> pause() async {
     await _player.pause();
+    await saveCurrentPlaybackSession();
   }
 
   Future<void> play() async {
@@ -344,6 +352,120 @@ class AudioPlayerService extends ChangeNotifier {
       _loopMode = LoopMode.off;
     }
     _player.setLoopMode(_loopMode);
+    notifyListeners();
+  }
+
+  static const String _keyLastSong = 'soundvibe_last_played_song_v1';
+  static const String _keyLastPos = 'soundvibe_last_played_pos_ms_v1';
+  static const String _keyLastQueue = 'soundvibe_last_played_queue_v1';
+
+  Future<void> savePlaybackSessionManually({
+    required SongModel song,
+    required Duration position,
+    required List<SongModel> queue,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyLastSong, json.encode(song.toJson()));
+      await prefs.setInt(_keyLastPos, position.inMilliseconds);
+      await prefs.setString(
+        _keyLastQueue,
+        json.encode(queue.map((s) => s.toJson()).toList()),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> saveCurrentPlaybackSession() async {
+    if (_currentSong == null) return;
+    await savePlaybackSessionManually(
+      song: _currentSong!,
+      position: _position,
+      queue: _queue,
+    );
+  }
+
+  Future<bool> restorePlaybackSession({bool autoPreparePlayer = true}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final songJson = prefs.getString(_keyLastSong);
+      if (songJson == null || songJson.isEmpty) return false;
+
+      final songMap = json.decode(songJson) as Map<String, dynamic>;
+      final restoredSong = SongModel.fromJson(songMap);
+
+      final posMs = prefs.getInt(_keyLastPos) ?? 0;
+      final restoredPosition = Duration(milliseconds: posMs);
+
+      final queueJson = prefs.getString(_keyLastQueue);
+      List<SongModel> restoredQueue = [restoredSong];
+      if (queueJson != null && queueJson.isNotEmpty) {
+        final List<dynamic> list = json.decode(queueJson);
+        final parsed = list.map((item) => SongModel.fromJson(item as Map<String, dynamic>)).toList();
+        if (parsed.isNotEmpty) {
+          restoredQueue = parsed;
+        }
+      }
+
+      _currentSong = restoredSong;
+      _position = restoredPosition;
+      _queue = restoredQueue;
+      _currentIndex = _queue.indexWhere((s) => s.id == restoredSong.id);
+      if (_currentIndex == -1) _currentIndex = 0;
+      _currentLanguageLock = restoredSong.language.toLowerCase().trim();
+
+      if (autoPreparePlayer) {
+        final audioSources = <AudioSource>[];
+        for (final s in _queue) {
+          final tag = _createMediaItem(s);
+          if (s.isOffline && s.localFilePath != null && File(s.localFilePath!).existsSync()) {
+            audioSources.add(AudioSource.file(s.localFilePath!, tag: tag));
+          } else if (s.streamUrl.isNotEmpty) {
+            audioSources.add(AudioSource.uri(Uri.parse(s.streamUrl), tag: tag));
+          } else {
+            audioSources.add(AudioSource.uri(Uri.parse('https://audio.kuchbhi.app/placeholder.mp3'), tag: tag));
+          }
+        }
+
+        if (audioSources.isNotEmpty) {
+          await _player.setAudioSources(
+            audioSources,
+            initialIndex: _currentIndex,
+            initialPosition: _position,
+          );
+        }
+      }
+
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> prefillInitialQueue(List<SongModel> songs) async {
+    if (_currentSong != null || songs.isEmpty) return;
+    _queue = List.from(songs);
+    _currentIndex = 0;
+    _currentSong = songs.first;
+    _position = Duration.zero;
+
+    final audioSources = <AudioSource>[];
+    for (final s in _queue) {
+      final tag = _createMediaItem(s);
+      if (s.streamUrl.isNotEmpty) {
+        audioSources.add(AudioSource.uri(Uri.parse(s.streamUrl), tag: tag));
+      }
+    }
+
+    if (audioSources.isNotEmpty) {
+      try {
+        await _player.setAudioSources(
+          audioSources,
+          initialIndex: 0,
+          initialPosition: Duration.zero,
+        );
+      } catch (_) {}
+    }
     notifyListeners();
   }
 

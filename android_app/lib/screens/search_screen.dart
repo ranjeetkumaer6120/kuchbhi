@@ -52,6 +52,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isSearching = false;
 
   List<SongModel> _trendingSongs = [];
+  List<SongModel> _suggestedSongs = [];
   bool _isLoadingTrending = false;
 
   List<String> _recentSearches = [];
@@ -81,11 +82,21 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _isLoadingTrending = true);
     try {
       final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
+      final topArtists = UserTasteService().getTopArtists(limit: 2);
+      final suggestQuery = topArtists.isNotEmpty
+          ? topArtists.first
+          : ((lang != null && lang != 'All') ? '$lang Top Hits' : 'Top Hindi Songs');
       final query = (lang != null && lang != 'All') ? '$lang Trending Hits' : 'Trending Hits';
-      final songs = await widget.apiService.searchSongs(query, page: 1, limit: 10, language: lang);
+
+      final results = await Future.wait([
+        widget.apiService.searchSongs(query, page: 1, limit: 10, language: lang),
+        widget.apiService.searchSongs(suggestQuery, page: 1, limit: 10, language: lang),
+      ]);
+
       if (mounted) {
         setState(() {
-          _trendingSongs = ApiService.deduplicateByQuality(songs);
+          _trendingSongs = ApiService.deduplicateByQuality(results[0]);
+          _suggestedSongs = ApiService.deduplicateByQuality(results[1]);
           _isLoadingTrending = false;
         });
       }
@@ -820,9 +831,58 @@ class _SearchScreenState extends State<SearchScreen> {
                                       const SizedBox(height: 24),
                                     ],
 
-                                    // Section: Trending Searches
+                                    // Section: Suggested Songs for You (Real Song suggestions, not just text!)
+                                    if (_suggestedSongs.isNotEmpty) ...[
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Row(
+                                            children: [
+                                              Icon(Icons.auto_awesome_rounded, color: AppTheme.applePink, size: 20),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Suggested Songs for You',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppTheme.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          TextButton.icon(
+                                            icon: const Icon(Icons.play_arrow_rounded, size: 18, color: AppTheme.applePink),
+                                            label: const Text(
+                                              'Play All',
+                                              style: TextStyle(
+                                                color: AppTheme.applePink,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            onPressed: () {
+                                              widget.playerService.playSong(_suggestedSongs.first, playlist: _suggestedSongs);
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ..._suggestedSongs.take(8).map((song) {
+                                        final isCurrent = widget.playerService.currentSong?.id == song.id;
+                                        return SongTileWidget(
+                                          song: song,
+                                          isPlaying: isCurrent && widget.playerService.isPlaying,
+                                          downloadService: widget.downloadService,
+                                          playlistService: widget.playlistService,
+                                          onTap: () => widget.playerService.playSong(song, playlist: _suggestedSongs),
+                                        );
+                                      }),
+                                      const SizedBox(height: 24),
+                                    ],
+
+                                    // Section: Quick Search Topics
                                     const Text(
-                                      'Trending Searches',
+                                      'Popular Topics',
                                       style: TextStyle(
                                           fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                                     ),
