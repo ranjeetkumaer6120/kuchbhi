@@ -51,10 +51,12 @@ void main() async {
 
   final apiService = ApiService();
   if (!restored) {
-    // Arm player with trending hits so car displays & Bluetooth AVRCP immediately have playable tracks
-    apiService.searchSongs('Trending Hits', limit: 10).then((songs) {
+    // Arm player with personalized trending hits so car displays (USB / Android Auto / Bluetooth) immediately have ready tracks
+    apiService.searchSongs('Trending Hits', limit: 15).then((songs) {
       if (songs.isNotEmpty) {
-        audioPlayerService.prefillInitialQueue(songs);
+        final deduplicated = ApiService.deduplicateByQuality(songs);
+        final personalized = UserTasteService().getPersonalizedTrending(deduplicated, limit: 10);
+        audioPlayerService.prefillInitialQueue(personalized);
       }
     }).catchError((_) {});
   }

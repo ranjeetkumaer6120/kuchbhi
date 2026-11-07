@@ -64,6 +64,21 @@ class AudioPlayerService extends ChangeNotifier {
 
   AudioPlayer get player => _player;
 
+  SongModel? _lastTrackForAnalytics;
+  Duration _lastTrackDurationPlayed = Duration.zero;
+
+  void _onTrackTransition(SongModel newSong) {
+    if (_lastTrackForAnalytics != null && _lastTrackForAnalytics!.id != newSong.id) {
+      if (_lastTrackDurationPlayed.inSeconds <= 15) {
+        UserTasteService().recordSkip(_lastTrackForAnalytics!, playedSeconds: _lastTrackDurationPlayed.inSeconds);
+      } else if (_lastTrackDurationPlayed.inSeconds >= 30) {
+        UserTasteService().recordCompletion(_lastTrackForAnalytics!);
+      }
+    }
+    _lastTrackForAnalytics = newSong;
+    _lastTrackDurationPlayed = Duration.zero;
+  }
+
   AudioPlayerService() {
     _initStreams();
   }
@@ -73,6 +88,9 @@ class AudioPlayerService extends ChangeNotifier {
       _isPlaying = state.playing;
       _isBuffering = state.processingState == ProcessingState.buffering;
       if (state.processingState == ProcessingState.completed) {
+        if (_currentSong != null) {
+          UserTasteService().recordCompletion(_currentSong!);
+        }
         if (SleepTimerService.instance.isEndOfSongMode) {
           SleepTimerService.instance.onSongCompleted();
           return;
@@ -91,6 +109,7 @@ class AudioPlayerService extends ChangeNotifier {
         _currentIndex = index;
         _currentSong = _queue[index];
         if (_currentSong != null) {
+          _onTrackTransition(_currentSong!);
           _currentLanguageLock = _currentSong!.language.toLowerCase().trim();
           UserTasteService().recordPlay(_currentSong!);
         }
@@ -133,6 +152,7 @@ class AudioPlayerService extends ChangeNotifier {
 
     _player.positionStream.listen((pos) {
       _position = pos;
+      _lastTrackDurationPlayed = pos;
       notifyListeners();
       // Periodically persist seek position every 5 seconds so on sudden minimize/kill, exact position is preserved
       if (pos.inSeconds > 0 && pos.inSeconds % 5 == 0) {
@@ -187,6 +207,7 @@ class AudioPlayerService extends ChangeNotifier {
         if (_currentIndex == -1) _currentIndex = 0;
       }
 
+      _onTrackTransition(song);
       _currentSong = song;
       _isBuffering = true;
       UserTasteService().recordPlay(song);
