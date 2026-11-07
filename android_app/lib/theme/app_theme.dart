@@ -1,35 +1,43 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Apple Music Iconic Colors
-  static const Color background = Color(0xFF0A0A0C);
-  static const Color surface = Color(0xFF16171E);
-  static const Color surfaceLight = Color(0xFF22232E);
-  static const Color border = Color(0xFF2C2D3A);
+  // Spotify Signature Palette
+  static const Color background = Color(0xFF121212); // Deep Spotify Dark Canvas
+  static const Color surface = Color(0xFF181818);    // Spotify Card Surface
+  static const Color surfaceLight = Color(0xFF242424); // Spotify Elevated Tile
+  static const Color surfaceElevated = Color(0xFF2A2A2A); // Spotify Chip / Card Hover
+  static const Color border = Color(0xFF282828);
   
-  static const Color appleRed = Color(0xFFFC3C44);
-  static const Color applePink = Color(0xFFFF6482);
-  static const Color emeraldGreen = Color(0xFF10B981);
-  static const Color cyberCyan = Color(0xFF06B6D4);
+  static const Color spotifyGreen = Color(0xFF1DB954);      // Iconic Spotify Vibrant Green
+  static const Color spotifyGreenLight = Color(0xFF1ED760); // Bright Green Highlight
+  static const Color spotifyBlack = Color(0xFF121212);
+
+  // Backward-compatible aliases
+  static const Color appleRed = spotifyGreen;
+  static const Color applePink = spotifyGreenLight;
+  static const Color emeraldGreen = spotifyGreen;
+  static const Color cyberCyan = spotifyGreen;
 
   static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFF9898A0);
-  static const Color textMuted = Color(0xFF636366);
+  static const Color textSecondary = Color(0xFFB3B3B3);
+  static const Color textMuted = Color(0xFF727272);
 
-  static LinearGradient get appleGradient => const LinearGradient(
-        colors: [appleRed, applePink],
+  static LinearGradient get spotifyGradient => const LinearGradient(
+        colors: [spotifyGreen, spotifyGreenLight],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
+
+  static LinearGradient get appleGradient => spotifyGradient;
 
   static ThemeData get darkTheme => ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: background,
-        primaryColor: appleRed,
+        primaryColor: spotifyGreen,
         colorScheme: const ColorScheme.dark(
-          primary: appleRed,
-          secondary: applePink,
+          primary: spotifyGreen,
+          secondary: spotifyGreenLight,
           surface: surface,
           surfaceContainerHighest: surfaceLight,
         ),
@@ -46,12 +54,12 @@ class AppTheme {
           iconTheme: IconThemeData(color: textPrimary),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Colors.transparent,
+          backgroundColor: background,
           elevation: 0,
-          selectedItemColor: appleRed,
+          selectedItemColor: Colors.white,
           unselectedItemColor: textSecondary,
-          selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: TextStyle(fontSize: 11),
+          selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+          unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
           type: BottomNavigationBarType.fixed,
         ),
       );

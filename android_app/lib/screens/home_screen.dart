@@ -91,7 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final lang = _selectedLanguage == 'All' ? null : _selectedLanguage;
       final rawSongs = await widget.apiService.getTrendingSongs(language: lang);
       final deduplicated = ApiService.deduplicateByQuality(rawSongs);
-      // Re-rank and filter according to user interest and taste profile
       songs = UserTasteService().getPersonalizedTrending(deduplicated, limit: 30);
     } else {
       final query = category.trim();
@@ -148,535 +147,575 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  List<SongModel> _getQuickGridItems() {
+    final taste = UserTasteService();
+    final mostPlayed = taste.getMostPlayedSongs(limit: 6);
+    if (mostPlayed.length >= 6) {
+      return mostPlayed.take(6).toList();
+    }
+
+    final recent = taste.getRecentlyPlayedSongs(limit: 6);
+    final combined = <SongModel>[...mostPlayed];
+    for (final r in recent) {
+      if (!combined.any((s) => s.id == r.id)) combined.add(r);
+    }
+
+    for (final t in _trendingSongs) {
+      if (combined.length >= 6) break;
+      if (!combined.any((s) => s.id == t.id)) combined.add(t);
+    }
+
+    return combined.take(6).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final heroSong = _trendingSongs.isNotEmpty ? _trendingSongs.first : null;
+    final quickItems = _getQuickGridItems();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Listen Now'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => _loadCategorySongs(_categories[_selectedCategoryIndex]),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        color: AppTheme.appleRed,
-        onRefresh: () => _loadCategorySongs(_categories[_selectedCategoryIndex]),
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Frosted Glass Language Filter Row
-              LanguageFilterBar(
-                selectedLanguage: _selectedLanguage,
-                onLanguageSelected: (lang) {
-                  if (_selectedLanguage != lang) {
-                    setState(() {
-                      _selectedLanguage = lang;
-                      _selectedCategoryIndex = 0;
-                    });
-                    _loadCategorySongs(_categories[0]);
-                  }
-                },
-              ),
-
-              const SizedBox(height: 10),
-
-              // Time of Day Contextual Greeting Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      TimeOfDayHelper.getGreeting(),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppTheme.appleRed.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.appleRed.withValues(alpha: 0.3)),
-                      ),
-                      child: const Text(
-                        'FOR YOU',
-                        style: TextStyle(
-                          fontSize: 9.5,
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: AppTheme.spotifyGreen,
+          backgroundColor: AppTheme.surfaceLight,
+          onRefresh: () => _loadCategorySongs(_categories[_selectedCategoryIndex]),
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: const EdgeInsets.only(bottom: 120),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Spotify Top Greeting Bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        TimeOfDayHelper.getGreeting(),
+                        style: const TextStyle(
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.applePink,
-                          letterSpacing: 0.5,
+                          color: Colors.white,
+                          letterSpacing: -0.6,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-
-              // Personalized Taste & Mood Pills (Driven by user listening interest)
-              ListenableBuilder(
-                listenable: Listenable.merge([UserTasteService(), widget.playlistService]),
-                builder: (context, _) {
-                  final tastePills = UserTasteService().getPersonalizedVibePills(
-                    favorites: widget.playlistService.favorites,
-                  );
-                  return SizedBox(
-                    height: 38,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: tastePills.length,
-                      itemBuilder: (context, index) {
-                        final mood = tastePills[index];
-                        final topArtists = UserTasteService().getTopArtists();
-                        final isPersonalized = mood == 'On Repeat' || mood == 'Favorites Mix' || topArtists.contains(mood);
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ActionChip(
-                            label: Text(
-                              mood,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
-                            ),
-                            backgroundColor: isPersonalized
-                                ? AppTheme.appleRed.withValues(alpha: 0.25)
-                                : AppTheme.surfaceLight,
-                            side: BorderSide(
-                              color: isPersonalized
-                                  ? AppTheme.appleRed.withValues(alpha: 0.5)
-                                  : AppTheme.border.withValues(alpha: 0.8),
-                            ),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+                            onPressed: () {},
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.history_rounded, color: Colors.white, size: 24),
                             onPressed: () {
-                              if (mood == 'On Repeat') {
-                                final mostPlayed = UserTasteService().getMostPlayedSongs();
-                                if (mostPlayed.isNotEmpty) {
-                                  widget.playerService.playSong(mostPlayed.first, playlist: mostPlayed);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Playing your most listened songs'),
-                                      backgroundColor: AppTheme.appleRed,
-                                    ),
-                                  );
-                                  return;
-                                }
-                              } else if (topArtists.contains(mood)) {
-                                _loadCategorySongs(mood);
-                                return;
-                              } else if (mood == 'Favorites Mix') {
-                                final favs = widget.playlistService.favorites;
-                                if (favs.isNotEmpty) {
-                                  widget.playerService.playSong(favs.first, playlist: favs);
-                                  return;
-                                }
+                              final recent = UserTasteService().getRecentlyPlayedSongs();
+                              if (recent.isNotEmpty) {
+                                widget.playerService.playSong(recent.first, playlist: recent);
                               }
-                              _loadCategorySongs(mood);
                             },
                           ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-
-              // Category Pills Carousel
-              SizedBox(
-                height: 44,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _categories.length,
-                  itemBuilder: (context, index) {
-                    final isSelected = _selectedCategoryIndex == index;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(
-                          _categories[index],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : AppTheme.textSecondary,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            fontSize: 13,
+                          IconButton(
+                            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 24),
+                            onPressed: () => _loadCategorySongs(_categories[_selectedCategoryIndex]),
                           ),
-                        ),
-                        selected: isSelected,
-                        selectedColor: AppTheme.appleRed,
-                        backgroundColor: AppTheme.surface,
-                        side: BorderSide(
-                          color: isSelected ? Colors.transparent : AppTheme.border,
-                        ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() => _selectedCategoryIndex = index);
-                            _loadCategorySongs(_categories[index]);
-                          }
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Spotify Quick Filter Pills (All / Music / Personalized Vibes)
+                ListenableBuilder(
+                  listenable: Listenable.merge([UserTasteService(), widget.playlistService]),
+                  builder: (context, _) {
+                    final tastePills = UserTasteService().getPersonalizedVibePills(
+                      favorites: widget.playlistService.favorites,
+                    );
+                    return SizedBox(
+                      height: 38,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: tastePills.length,
+                        itemBuilder: (context, index) {
+                          final pill = tastePills[index];
+                          final isPersonalized = pill == 'On Repeat' ||
+                              pill == 'Heavy Rotation' ||
+                              pill == 'Favorites Mix' ||
+                              UserTasteService().getTopArtists().contains(pill);
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ActionChip(
+                              label: Text(
+                                pill,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              backgroundColor: isPersonalized
+                                  ? AppTheme.spotifyGreen.withValues(alpha: 0.22)
+                                  : AppTheme.surfaceLight,
+                              side: BorderSide(
+                                color: isPersonalized
+                                    ? AppTheme.spotifyGreen.withValues(alpha: 0.5)
+                                    : Colors.transparent,
+                                width: 0.8,
+                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              onPressed: () {
+                                if (pill == 'On Repeat') {
+                                  final mostPlayed = UserTasteService().getMostPlayedSongs();
+                                  if (mostPlayed.isNotEmpty) {
+                                    widget.playerService.playSong(mostPlayed.first, playlist: mostPlayed);
+                                    return;
+                                  }
+                                } else if (pill == 'Heavy Rotation') {
+                                  final heavy = UserTasteService().getHeavyRotationSongs();
+                                  if (heavy.isNotEmpty) {
+                                    widget.playerService.playSong(heavy.first, playlist: heavy);
+                                    return;
+                                  }
+                                } else if (pill == 'Favorites Mix') {
+                                  final favs = widget.playlistService.favorites;
+                                  if (favs.isNotEmpty) {
+                                    widget.playerService.playSong(favs.first, playlist: favs);
+                                    return;
+                                  }
+                                }
+                                _loadCategorySongs(pill);
+                              },
+                            ),
+                          );
                         },
                       ),
                     );
                   },
                 ),
-              ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
-              // Featured Hero Banner (Apple Music Big Card style)
-              if (heroSong != null) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: GestureDetector(
-                    onTap: () => widget.playerService.playSong(heroSong, playlist: _trendingSongs),
-                    child: Container(
-                      height: 200,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.appleRed.withValues(alpha: 0.18),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+                // Spotify's Signature 6-Tile Quick Access Grid (2 columns x 3 rows)
+                if (quickItems.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 3.1,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Stack(
-                          children: [
-                            // Hero Artwork Image
-                            Positioned.fill(
-                              child: heroSong.artworkUrl.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: heroSong.artworkUrl,
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Container(color: AppTheme.surfaceLight),
+                      itemCount: quickItems.length,
+                      itemBuilder: (context, index) {
+                        final song = quickItems[index];
+                        final isPlayingThis = widget.playerService.currentSong?.id == song.id &&
+                            widget.playerService.isPlaying;
+
+                        return Material(
+                          color: const Color(0xFF242424),
+                          borderRadius: BorderRadius.circular(4),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () => widget.playerService.playSong(song, playlist: quickItems),
+                            child: Row(
+                              children: [
+                                // Left Square Artwork
+                                SizedBox(
+                                  width: 54,
+                                  height: 54,
+                                  child: song.artworkUrl.isNotEmpty
+                                      ? CachedNetworkImage(
+                                          imageUrl: song.artworkUrl,
+                                          fit: BoxFit.cover,
+                                          placeholder: (_, _) => Container(color: AppTheme.surfaceLight),
+                                          errorWidget: (_, _, _) => Container(
+                                            color: AppTheme.surfaceLight,
+                                            child: const Icon(Icons.music_note, color: Colors.white54),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: AppTheme.surfaceLight,
+                                          child: const Icon(Icons.music_note, color: Colors.white54),
+                                        ),
+                                ),
+                                const SizedBox(width: 8),
+
+                                // Title
+                                Expanded(
+                                  child: Text(
+                                    song.title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isPlayingThis ? AppTheme.spotifyGreen : Colors.white,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                ),
+
+                                // Play Indicator or Icon
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: isPlayingThis
+                                      ? const Icon(Icons.equalizer_rounded, color: AppTheme.spotifyGreen, size: 20)
+                                      : Container(
+                                          width: 26,
+                                          height: 26,
+                                          decoration: const BoxDecoration(
+                                            color: AppTheme.spotifyGreen,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.play_arrow_rounded,
+                                            color: Colors.black,
+                                            size: 18,
+                                          ),
+                                        ),
+                                ),
+                              ],
                             ),
-                            // Gradient Overlay for Readability
-                            Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.transparent,
-                                      Colors.black.withValues(alpha: 0.4),
-                                      Colors.black.withValues(alpha: 0.95),
-                                    ],
-                                    stops: const [0.3, 0.65, 1.0],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+
+                // Spotify Language Selector Row
+                LanguageFilterBar(
+                  selectedLanguage: _selectedLanguage,
+                  onLanguageSelected: (lang) {
+                    if (_selectedLanguage != lang) {
+                      setState(() {
+                        _selectedLanguage = lang;
+                        _selectedCategoryIndex = 0;
+                      });
+                      _loadCategorySongs(_categories[0]);
+                    }
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Spotify Carousel 1: "Jump Back In" / "Recently Played"
+                ListenableBuilder(
+                  listenable: UserTasteService(),
+                  builder: (context, _) {
+                    final recentOrMostPlayed = UserTasteService().getMostPlayedSongs(limit: 8);
+                    if (recentOrMostPlayed.isEmpty) return const SizedBox.shrink();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Jump Back In',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  widget.playerService.playSong(recentOrMostPlayed.first, playlist: recentOrMostPlayed);
+                                },
+                                child: const Text(
+                                  'Play All',
+                                  style: TextStyle(
+                                    color: AppTheme.spotifyGreen,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ),
-                            ),
-                            // Content
-                            Positioned(
-                              bottom: 16,
-                              left: 16,
-                              right: 16,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Expanded(
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: 195,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: recentOrMostPlayed.length,
+                            itemBuilder: (context, index) {
+                              final song = recentOrMostPlayed[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 14),
+                                child: GestureDetector(
+                                  onTap: () => widget.playerService.playSong(song, playlist: recentOrMostPlayed),
+                                  child: SizedBox(
+                                    width: 135,
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.appleRed,
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: const Text(
-                                            'FEATURED TRACK • MASTER AUDIO',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                              letterSpacing: 0.5,
-                                            ),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: SizedBox(
+                                            width: 135,
+                                            height: 135,
+                                            child: song.artworkUrl.isNotEmpty
+                                                ? CachedNetworkImage(
+                                                    imageUrl: song.artworkUrl,
+                                                    fit: BoxFit.cover,
+                                                    errorWidget: (_, _, _) => Container(color: AppTheme.surfaceLight),
+                                                  )
+                                                : Container(
+                                                    color: AppTheme.surfaceLight,
+                                                    child: const Icon(Icons.music_note, color: Colors.white54),
+                                                  ),
                                           ),
                                         ),
-                                        const SizedBox(height: 6),
+                                        const SizedBox(height: 8),
                                         Text(
-                                          heroSong.title,
+                                          song.title,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            fontSize: 20,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          heroSong.artist,
+                                          song.artist,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.white70,
+                                            fontSize: 11.5,
+                                            color: AppTheme.textSecondary,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  // Big Play Button
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      gradient: AppTheme.appleGradient,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppTheme.appleRed.withValues(alpha: 0.4),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.play_arrow_rounded,
-                                      color: Colors.white,
-                                      size: 30,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-
-              // Jump Back In • On Repeat (User Most Played)
-              ListenableBuilder(
-                listenable: UserTasteService(),
-                builder: (context, _) {
-                  final mostPlayed = UserTasteService().getMostPlayedSongs(limit: 8);
-                  if (mostPlayed.isEmpty) return const SizedBox.shrink();
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.repeat_rounded, color: AppTheme.appleRed, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Jump Back In • On Repeat',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
-                              ],
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                widget.playerService.playSong(mostPlayed.first, playlist: mostPlayed);
-                              },
-                              child: const Text('Play All', style: TextStyle(color: AppTheme.appleRed, fontWeight: FontWeight.bold, fontSize: 13)),
-                            ),
-                          ],
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        height: 160,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: mostPlayed.length,
-                          itemBuilder: (context, index) {
-                            final song = mostPlayed[index];
-                            final playCount = UserTasteService().getPlayCount(song.id);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: GestureDetector(
-                                onTap: () => widget.playerService.playSong(song, playlist: mostPlayed),
-                                child: SizedBox(
-                                  width: 110,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Stack(
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(12),
-                                            child: SizedBox(
-                                              width: 110,
-                                              height: 110,
-                                              child: song.artworkUrl.isNotEmpty
-                                                  ? CachedNetworkImage(
-                                                      imageUrl: song.artworkUrl,
-                                                      fit: BoxFit.cover,
-                                                      errorWidget: (_, _, _) => Container(color: AppTheme.surfaceLight),
-                                                    )
-                                                  : Container(
-                                                      color: AppTheme.surfaceLight,
-                                                      child: const Icon(Icons.music_note, color: Colors.white54),
-                                                    ),
-                                            ),
-                                          ),
-                                          Positioned(
-                                            bottom: 6,
-                                            right: 6,
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withValues(alpha: 0.75),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '$playCount plays',
-                                                style: const TextStyle(
-                                                  fontSize: 9.5,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.applePink,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        song.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
-                                      ),
-                                      Text(
-                                        song.artist,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  );
-                },
-              ),
-
-              // Section: Unlimited Top Songs
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _selectedCategoryIndex == 0
-                          ? 'Trending for You'
-                          : 'Top Tracks (${_categories[_selectedCategoryIndex]})',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                    ),
-                    const Text('Master HD', style: TextStyle(fontSize: 12, color: AppTheme.emeraldGreen, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-
-              if (_isLoading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: CircularProgressIndicator(color: AppTheme.appleRed),
-                  ),
-                )
-              else if (_trendingSongs.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Text('No songs found. Check your internet connection.', style: TextStyle(color: AppTheme.textSecondary)),
-                  ),
-                )
-              else ...[
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _trendingSongs.length,
-                  itemBuilder: (context, index) {
-                    final song = _trendingSongs[index];
-                    final isCurrent = widget.playerService.currentSong?.id == song.id;
-
-                    return SongTileWidget(
-                      song: song,
-                      isPlaying: isCurrent && widget.playerService.isPlaying,
-                      downloadService: widget.downloadService,
-                      playlistService: widget.playlistService,
-                      onTap: () => widget.playerService.playSong(song, playlist: _trendingSongs),
+                        const SizedBox(height: 12),
+                      ],
                     );
                   },
                 ),
 
-                // Infinite Scroll Loading Indicator
-                if (_isLoadingMore)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Center(
-                      child: CircularProgressIndicator(color: AppTheme.appleRed, strokeWidth: 2),
-                    ),
-                  ),
+                // Spotify Carousel 2: "Popular Artists"
+                ListenableBuilder(
+                  listenable: UserTasteService(),
+                  builder: (context, _) {
+                    final topArtists = UserTasteService().getTopArtists(limit: 6);
+                    if (topArtists.isEmpty) return const SizedBox.shrink();
 
-                // Footer Developer Credit (Requested by user)
-                Padding(
-                  padding: const EdgeInsets.only(top: 28, bottom: 12),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.favorite_rounded, size: 13, color: AppTheme.appleRed),
-                          SizedBox(width: 6),
-                          Text(
-                            'Developed by Ranjeet Kumar',
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          child: Text(
+                            'Your Favorite Artists',
                             style: TextStyle(
-                              fontSize: 11.5,
-                              color: AppTheme.textSecondary,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
                             ),
                           ),
-                        ],
+                        ),
+                        SizedBox(
+                          height: 145,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: topArtists.length,
+                            itemBuilder: (context, index) {
+                              final artist = topArtists[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 16),
+                                child: GestureDetector(
+                                  onTap: () => _loadCategorySongs(artist),
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        width: 90,
+                                        height: 90,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppTheme.surfaceLight,
+                                          border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            artist.isNotEmpty ? artist[0].toUpperCase() : 'A',
+                                            style: const TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.spotifyGreen,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      SizedBox(
+                                        width: 90,
+                                        child: Text(
+                                          artist,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    );
+                  },
+                ),
+
+                // Spotify Section Header: Trending or Selected Category
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _selectedCategoryIndex == 0
+                            ? 'Trending for You'
+                            : _categories[_selectedCategoryIndex],
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.spotifyGreen.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppTheme.spotifyGreen.withValues(alpha: 0.4)),
+                        ),
+                        child: const Text(
+                          '320KBPS HD',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.spotifyGreen,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Song Tiles List
+                if (_isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(color: AppTheme.spotifyGreen),
+                    ),
+                  )
+                else if (_trendingSongs.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Text(
+                        'No songs found. Check your internet connection.',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
+                    ),
+                  )
+                else ...[
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _trendingSongs.length,
+                    itemBuilder: (context, index) {
+                      final song = _trendingSongs[index];
+                      final isCurrent = widget.playerService.currentSong?.id == song.id;
+
+                      return SongTileWidget(
+                        song: song,
+                        isPlaying: isCurrent && widget.playerService.isPlaying,
+                        downloadService: widget.downloadService,
+                        playlistService: widget.playlistService,
+                        onTap: () => widget.playerService.playSong(song, playlist: _trendingSongs),
+                      );
+                    },
+                  ),
+
+                  // Infinite Scroll Loading Indicator
+                  if (_isLoadingMore)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: CircularProgressIndicator(color: AppTheme.spotifyGreen, strokeWidth: 2),
+                      ),
+                    ),
+
+                  // Footer Credit
+                  Padding(
+                    padding: const EdgeInsets.only(top: 28, bottom: 12),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.favorite_rounded, size: 13, color: AppTheme.spotifyGreen),
+                            SizedBox(width: 6),
+                            Text(
+                              'Developed by Ranjeet Kumar',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: AppTheme.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

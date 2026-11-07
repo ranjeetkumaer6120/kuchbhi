@@ -231,11 +231,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             BottomNavigationBar(
               currentIndex: _currentTabIndex,
               onTap: (index) => setState(() => _currentTabIndex = index),
+              backgroundColor: AppTheme.background,
               items: const [
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.play_circle_outline_rounded),
-                  activeIcon: Icon(Icons.play_circle_fill_rounded),
-                  label: 'Listen Now',
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home_filled),
+                  label: 'Home',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.search_rounded),
@@ -243,9 +244,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   label: 'Search',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.library_music_outlined),
-                  activeIcon: Icon(Icons.library_music_rounded),
-                  label: 'Library',
+                  icon: Icon(Icons.collections_bookmark_outlined),
+                  activeIcon: Icon(Icons.collections_bookmark_rounded),
+                  label: 'Your Library',
                 ),
               ],
             ),

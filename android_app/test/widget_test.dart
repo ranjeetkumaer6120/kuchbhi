@@ -27,8 +27,8 @@ void main() {
       playlistService: playlistService,
     ));
 
-    expect(find.text('Listen Now'), findsWidgets);
+    expect(find.text('Home'), findsWidgets);
     expect(find.text('Search'), findsOneWidget);
-    expect(find.text('Library'), findsOneWidget);
+    expect(find.text('Your Library'), findsOneWidget);
   });
 }

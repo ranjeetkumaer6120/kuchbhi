@@ -57,6 +57,19 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<String> _recentSearches = [];
 
+  final List<Map<String, dynamic>> _browseGenres = const [
+    {'title': 'Bollywood', 'color': Color(0xFFE13300), 'query': 'Bollywood Hits'},
+    {'title': 'Punjabi', 'color': Color(0xFF7358FF), 'query': 'Punjabi Top'},
+    {'title': 'Bhojpuri', 'color': Color(0xFF1E3264), 'query': 'Bhojpuri Hits'},
+    {'title': 'Hindi Pop', 'color': Color(0xFFE8115B), 'query': 'Hindi Pop'},
+    {'title': 'Lo-Fi Chill', 'color': Color(0xFF148A08), 'query': 'Lo-Fi Chill'},
+    {'title': 'Arijit Singh', 'color': Color(0xFF503750), 'query': 'Arijit Singh'},
+    {'title': 'Party Hits', 'color': Color(0xFFBC5900), 'query': 'Party Hits'},
+    {'title': 'Romance', 'color': Color(0xFF0D73EC), 'query': 'Romantic Hindi'},
+    {'title': 'Slowed & Reverb', 'color': Color(0xFF8D67AB), 'query': 'Lo-Fi Slowed'},
+    {'title': 'Indie India', 'color': Color(0xFFD84000), 'query': 'Indie India'},
+  ];
+
   final List<String> _suggestions = [
     'Bhojpuri Top 50',
     'Pawan Singh',
@@ -471,23 +484,23 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Container(
               decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.border),
+                color: const Color(0xFF242424),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: TextField(
                 controller: _searchController,
                 onChanged: _onSearchChanged,
                 onSubmitted: _performSearch,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
                 decoration: InputDecoration(
                   hintText: _searchSectionIndex == 1
                       ? 'Search Artists (Arijit, Pawan Singh...)'
                       : (_searchSectionIndex == 2
                           ? 'Search Playlists (Top 50, Party, Lo-Fi...)'
-                          : 'Artists, songs, lyrics, Bhojpuri, English...'),
-                  hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14.5),
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.appleRed),
+                          : 'What do you want to listen to?'),
+                  hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                  prefixIcon: const Icon(Icons.search_rounded, color: Colors.white70),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear_rounded, color: AppTheme.textSecondary),
@@ -498,7 +511,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ),
@@ -883,30 +896,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                       const SizedBox(height: 24),
                                     ],
 
-                                    // Section: Quick Search Topics
-                                    const Text(
-                                      'Popular Topics',
-                                      style: TextStyle(
-                                          fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: _suggestions.map((query) {
-                                        return ActionChip(
-                                          backgroundColor: AppTheme.surface,
-                                          side: const BorderSide(color: AppTheme.border),
-                                          label:
-                                              Text(query, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                                          onPressed: () {
-                                            _searchController.text = query;
-                                            _performSearch(query);
-                                          },
-                                        );
-                                      }).toList(),
-                                    ),
-                                    const SizedBox(height: 36),
+                                    // Spotify Signature "Browse all" Colorful Cards Grid
+                                    _buildBrowseAllGrid(),
+                                    const SizedBox(height: 16),
                                     Center(
                                       child: Column(
                                         children: [
@@ -948,6 +940,90 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBrowseAllGrid() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Browse all',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.7,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+          ),
+          itemCount: _browseGenres.length,
+          itemBuilder: (context, index) {
+            final item = _browseGenres[index];
+            final title = item['title'] as String;
+            final color = item['color'] as Color;
+            final query = item['query'] as String;
+
+            return Material(
+              color: color,
+              borderRadius: BorderRadius.circular(8),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () {
+                  _searchController.text = query;
+                  _performSearch(query);
+                },
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -6,
+                      right: -8,
+                      child: Transform.rotate(
+                        angle: 0.35,
+                        child: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(
+                            Icons.music_note_rounded,
+                            color: Colors.white60,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 
