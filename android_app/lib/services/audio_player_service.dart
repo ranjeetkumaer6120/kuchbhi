@@ -83,6 +83,8 @@ class AudioPlayerService extends ChangeNotifier {
     _initStreams();
   }
 
+  bool _isRestoringSession = false;
+
   void _initStreams() {
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
@@ -105,6 +107,7 @@ class AudioPlayerService extends ChangeNotifier {
     });
 
     _player.currentIndexStream.listen((index) async {
+      if (_isRestoringSession) return;
       if (index != null && index >= 0 && index < _queue.length) {
         _currentIndex = index;
         _currentSong = _queue[index];
@@ -151,6 +154,11 @@ class AudioPlayerService extends ChangeNotifier {
     });
 
     _player.positionStream.listen((pos) {
+      if (_isRestoringSession) return;
+      if (!_player.playing && pos == Duration.zero && _position > Duration.zero) {
+        // Retain saved playback position before user resumes playback
+        return;
+      }
       _position = pos;
       _lastTrackDurationPlayed = pos;
       notifyListeners();
@@ -290,19 +298,31 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> play() async {
-    await _player.play();
+    if (_currentSong == null) return;
+    if (_player.audioSource == null) {
+      await playSong(_currentSong!, playlist: _queue);
+      if (_position > Duration.zero) {
+        await _player.seek(_position);
+      }
+    } else {
+      await _player.play();
+      await saveCurrentPlaybackSession();
+    }
   }
 
   Future<void> togglePlayPause() async {
+    if (_currentSong == null) return;
     if (_player.playing) {
-      await _player.pause();
+      await pause();
     } else {
-      await _player.play();
+      await play();
     }
   }
 
   Future<void> seek(Duration pos) async {
+    _position = pos;
     await _player.seek(pos);
+    await saveCurrentPlaybackSession();
   }
 
   Future<void> playNext() async {
@@ -313,6 +333,7 @@ class AudioPlayerService extends ChangeNotifier {
     } else if (_currentLanguageLock != null && _currentLanguageLock!.isNotEmpty) {
       await _autoPopulateNextTracks();
     }
+    await saveCurrentPlaybackSession();
   }
 
   Future<void> _autoPopulateNextTracks() async {
@@ -356,6 +377,7 @@ class AudioPlayerService extends ChangeNotifier {
     } else {
       await seek(Duration.zero);
     }
+    await saveCurrentPlaybackSession();
   }
 
   void toggleShuffle() {
@@ -398,14 +420,16 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> saveCurrentPlaybackSession() async {
     if (_currentSong == null) return;
+    final currentPos = _player.position > Duration.zero ? _player.position : _position;
     await savePlaybackSessionManually(
       song: _currentSong!,
-      position: _position,
+      position: currentPos,
       queue: _queue,
     );
   }
 
   Future<bool> restorePlaybackSession({bool autoPreparePlayer = true}) async {
+    _isRestoringSession = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final songJson = prefs.getString(_keyLastSong);
@@ -434,25 +458,32 @@ class AudioPlayerService extends ChangeNotifier {
       if (_currentIndex == -1) _currentIndex = 0;
       _currentLanguageLock = restoredSong.language.toLowerCase().trim();
 
-      if (autoPreparePlayer) {
-        final audioSources = <AudioSource>[];
-        for (final s in _queue) {
-          final tag = _createMediaItem(s);
-          if (s.isOffline && s.localFilePath != null && File(s.localFilePath!).existsSync()) {
-            audioSources.add(AudioSource.file(s.localFilePath!, tag: tag));
-          } else if (s.streamUrl.isNotEmpty) {
-            audioSources.add(AudioSource.uri(Uri.parse(s.streamUrl), tag: tag));
-          } else {
-            audioSources.add(AudioSource.uri(Uri.parse('https://audio.kuchbhi.app/placeholder.mp3'), tag: tag));
-          }
-        }
+      // Immediately notify UI so previous song renders in MiniPlayer & PlayerScreen with zero delay
+      notifyListeners();
 
-        if (audioSources.isNotEmpty) {
-          await _player.setAudioSources(
-            audioSources,
-            initialIndex: _currentIndex,
-            initialPosition: _position,
-          );
+      if (autoPreparePlayer) {
+        try {
+          final audioSources = <AudioSource>[];
+          for (final s in _queue) {
+            final tag = _createMediaItem(s);
+            if (s.isOffline && s.localFilePath != null && File(s.localFilePath!).existsSync()) {
+              audioSources.add(AudioSource.file(s.localFilePath!, tag: tag));
+            } else if (s.streamUrl.isNotEmpty) {
+              audioSources.add(AudioSource.uri(Uri.parse(s.streamUrl), tag: tag));
+            } else {
+              audioSources.add(AudioSource.uri(Uri.parse('https://audio.kuchbhi.app/placeholder.mp3'), tag: tag));
+            }
+          }
+
+          if (audioSources.isNotEmpty) {
+            await _player.setAudioSources(
+              audioSources,
+              initialIndex: _currentIndex,
+              initialPosition: _position,
+            );
+          }
+        } catch (e) {
+          debugPrint('AudioPlayerService: setAudioSources prepare deferred ($e)');
         }
       }
 
@@ -460,6 +491,8 @@ class AudioPlayerService extends ChangeNotifier {
       return true;
     } catch (_) {
       return false;
+    } finally {
+      _isRestoringSession = false;
     }
   }
 

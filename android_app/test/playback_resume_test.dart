@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:soundvibe/models/song_model.dart';
@@ -6,36 +7,38 @@ import 'package:soundvibe/services/audio_player_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('com.ryanheise.just_audio.methods'),
+      (MethodCall methodCall) async {
+        return null;
+      },
+    );
+  });
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('AudioPlayerService persists and restores last played song, position and queue', () async {
-    final playerService = AudioPlayerService();
-
-    final testSong = SongModel(
-      id: 'song_kesariya',
-      title: 'Kesariya',
-      artist: 'Arijit Singh',
-      album: 'Brahmastra',
-      duration: 268,
-      streamUrl: 'https://cdn.example.com/kesariya.mp3',
-      artworkUrl: 'https://cdn.example.com/art.jpg',
+  SongModel createTestSong({required String id, required String title, String artist = 'Arijit Singh'}) {
+    return SongModel(
+      id: id,
+      title: title,
+      artist: artist,
+      album: 'Test Album',
+      duration: 250,
+      streamUrl: 'https://cdn.example.com/$id.mp3',
+      artworkUrl: 'https://cdn.example.com/$id.jpg',
       language: 'hindi',
     );
+  }
 
+  test('AudioPlayerService persists and restores last played song, position and queue', () async {
+    final playerService = AudioPlayerService();
+    final testSong = createTestSong(id: 'song_kesariya', title: 'Kesariya');
     final queue = [
       testSong,
-      SongModel(
-        id: 'song_apna',
-        title: 'Apna Bana Le',
-        artist: 'Arijit Singh',
-        album: 'Bhediya',
-        duration: 240,
-        streamUrl: 'https://cdn.example.com/apna.mp3',
-        artworkUrl: 'https://cdn.example.com/art2.jpg',
-        language: 'hindi',
-      ),
+      createTestSong(id: 'song_apna', title: 'Apna Bana Le'),
     ];
 
     // Save playback session at 85 seconds (1m 25s)
