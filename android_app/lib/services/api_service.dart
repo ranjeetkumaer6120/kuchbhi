@@ -142,6 +142,25 @@ class ApiService {
     return [];
   }
 
+  static final RegExp _unplayableTitleRegex = RegExp(
+    r'\b(jukebox|audio\s*jukebox|video\s*jukebox|full\s*album|non\s*stop|compilation|mashup|live\s*stream|all\s*songs|top\s*\d+\s*songs|dj\s*nonstop|all\s*hit\s*songs|full\s*movie)\b',
+    caseSensitive: false,
+  );
+
+  /// Validates whether a track is an individual playable single song,
+  /// strictly filtering out multi-hour jukeboxes, albums, mashups, teasers, and live streams.
+  static bool isPlayableSingleTrack(String title, int? durationSeconds) {
+    if (durationSeconds != null) {
+      if (durationSeconds <= 0 || durationSeconds < 45 || durationSeconds > 720) {
+        return false;
+      }
+    }
+    if (_unplayableTitleRegex.hasMatch(title)) {
+      return false;
+    }
+    return true;
+  }
+
   /// Search YouTube Audio Streams via official direct client extraction (Rank 3: 160-192kbps)
   Future<List<SongModel>> searchYouTube(String query) async {
     if (query.trim().isEmpty) return [];
@@ -150,18 +169,26 @@ class ApiService {
       final searchList = await _yt.search.search(query);
       final ytSongs = <SongModel>[];
 
-      for (final video in searchList.take(20)) {
+      for (final video in searchList) {
+        final durSeconds = video.duration?.inSeconds;
+        // Strict filter: Exclude jukeboxes, multi-hour albums, teaser clips, and live streams
+        if (!isPlayableSingleTrack(video.title, durSeconds)) {
+          continue;
+        }
+
         ytSongs.add(SongModel(
           id: video.id.value,
           title: video.title,
           artist: video.author,
           album: 'Single',
-          duration: video.duration?.inSeconds ?? 0,
+          duration: durSeconds ?? 0,
           streamUrl: '', // Will be resolved dynamically on tap or download
           artworkUrl: video.thumbnails.highResUrl,
           source: 'youtube',
           qualityBadge: 'Studio HD',
         ));
+
+        if (ytSongs.length >= 20) break;
       }
       return deduplicateByQuality(ytSongs);
     } catch (_) {

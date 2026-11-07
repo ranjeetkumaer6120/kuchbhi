@@ -86,6 +86,17 @@ class AudioPlayerService extends ChangeNotifier {
   bool _isRestoringSession = false;
 
   void _initStreams() {
+    _player.playbackEventStream.listen(
+      (event) {},
+      onError: (Object e, StackTrace st) {
+        _isBuffering = false;
+        notifyListeners();
+        if (_queue.length > 1) {
+          playNext();
+        }
+      },
+    );
+
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       _isBuffering = state.processingState == ProcessingState.buffering;
@@ -123,8 +134,27 @@ class AudioPlayerService extends ChangeNotifier {
 
         // Resolve YouTube stream on demand if entering a track without pre-resolved URL
         if (_currentSong!.source == 'youtube' &&
-            (_currentSong!.streamUrl.isEmpty || _currentSong!.streamUrl.contains('kuchbhi.app'))) {
-          final directUrl = await _apiService.getYouTubeAudioStream(_currentSong!.id);
+            (_currentSong!.streamUrl.isEmpty || _currentSong!.streamUrl.contains('data:audio') || _currentSong!.streamUrl.contains('kuchbhi.app'))) {
+          String? directUrl;
+          try {
+            directUrl = await _apiService.getYouTubeAudioStream(_currentSong!.id);
+          } catch (_) {}
+
+          // Automatic 320kbps JioSaavn fallback if YouTube stream extraction fails
+          if (directUrl == null || directUrl.isEmpty) {
+            try {
+              final cleanTitle = ApiService.normalizeSongTitle(_currentSong!.title);
+              final cleanArtist = ApiService.normalizeArtist(_currentSong!.artist);
+              final fallbackQuery = cleanArtist.isNotEmpty && cleanArtist != 'unknown' && !cleanArtist.contains('youtube')
+                  ? '$cleanTitle $cleanArtist'
+                  : cleanTitle;
+              final saavnMatches = await _apiService.searchSongs(fallbackQuery, limit: 3, language: _currentSong!.language);
+              if (saavnMatches.isNotEmpty && saavnMatches.first.streamUrl.isNotEmpty) {
+                directUrl = saavnMatches.first.streamUrl;
+              }
+            } catch (_) {}
+          }
+
           if (directUrl != null && directUrl.isNotEmpty) {
             final resolved = SongModel(
               id: _currentSong!.id,
@@ -150,6 +180,11 @@ class AudioPlayerService extends ChangeNotifier {
                 AudioSource.uri(Uri.parse(directUrl), tag: _createMediaItem(resolved)),
               );
               await _player.seek(Duration.zero, index: index);
+            }
+          } else {
+            // Track completely unresolvable -> cleanly skip to next track
+            if (_player.hasNext) {
+              await _player.seekToNext();
             }
           }
         }
@@ -227,7 +262,11 @@ class AudioPlayerService extends ChangeNotifier {
 
       // Resolve stream URL for current track if needed
       if (song.source == 'youtube' || song.streamUrl.isEmpty) {
-        final directUrl = await _apiService.getYouTubeAudioStream(song.id);
+        String? directUrl;
+        try {
+          directUrl = await _apiService.getYouTubeAudioStream(song.id);
+        } catch (_) {}
+
         if (directUrl != null && directUrl.isNotEmpty) {
           song = SongModel(
             id: song.id,
@@ -245,6 +284,37 @@ class AudioPlayerService extends ChangeNotifier {
           );
           _queue[_currentIndex] = song;
           _currentSong = song;
+        } else {
+          // Automatic 320kbps JioSaavn Fallback!
+          // If YouTube direct extraction failed (due to cipher/jukebox/rate limit),
+          // search JioSaavn for the official 320kbps studio version.
+          try {
+            final cleanTitle = ApiService.normalizeSongTitle(song.title);
+            final cleanArtist = ApiService.normalizeArtist(song.artist);
+            final fallbackQuery = cleanArtist.isNotEmpty && cleanArtist != 'unknown' && !cleanArtist.contains('youtube')
+                ? '$cleanTitle $cleanArtist'
+                : cleanTitle;
+            final saavnMatches = await _apiService.searchSongs(fallbackQuery, limit: 5, language: song.language);
+            if (saavnMatches.isNotEmpty && saavnMatches.first.streamUrl.isNotEmpty) {
+              final fallback = saavnMatches.first;
+              song = SongModel(
+                id: fallback.id,
+                title: fallback.title,
+                artist: fallback.artist,
+                album: fallback.album,
+                duration: fallback.duration > 0 ? fallback.duration : song.duration,
+                streamUrl: fallback.streamUrl,
+                artworkUrl: fallback.artworkUrl.isNotEmpty ? fallback.artworkUrl : song.artworkUrl,
+                source: fallback.source,
+                qualityBadge: '320kbps HD',
+                language: fallback.language,
+                isOffline: fallback.isOffline,
+                localFilePath: fallback.localFilePath,
+              );
+              _queue[_currentIndex] = song;
+              _currentSong = song;
+            }
+          } catch (_) {}
         }
       } else if (song.source == 'itunes' || song.streamUrl.contains('itunes.apple.com')) {
         final fullSaavn = await _apiService.searchSongs('${song.title} ${song.artist}', language: song.language);
@@ -268,6 +338,23 @@ class AudioPlayerService extends ChangeNotifier {
         }
       }
 
+      // If after all resolution attempts, streamUrl is still empty and not offline:
+      if (song.streamUrl.isEmpty && (!song.isOffline || song.localFilePath == null)) {
+        _isBuffering = false;
+        notifyListeners();
+        // Remove unplayable track from queue so the player never freezes on 0:00
+        if (_queue.length > 1) {
+          _queue.removeAt(_currentIndex);
+          if (_currentIndex >= _queue.length) {
+            _currentIndex = 0;
+          }
+          if (_queue.isNotEmpty) {
+            await playSong(_queue[_currentIndex], playlist: _queue);
+          }
+        }
+        return;
+      }
+
       // Set playlist audio sources so ExoPlayer natively handles background track transitions
       // and system notification displays Skip to Previous / Skip to Next buttons!
       final audioSources = <AudioSource>[];
@@ -278,7 +365,11 @@ class AudioPlayerService extends ChangeNotifier {
         } else if (s.streamUrl.isNotEmpty) {
           audioSources.add(AudioSource.uri(Uri.parse(s.streamUrl), tag: tag));
         } else {
-          audioSources.add(AudioSource.uri(Uri.parse('https://audio.kuchbhi.app/placeholder.mp3'), tag: tag));
+          // Safe silent WAV placeholder data URI to prevent ExoPlayer 404 connection errors
+          audioSources.add(AudioSource.uri(
+            Uri.parse('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='),
+            tag: tag,
+          ));
         }
       }
 
@@ -293,6 +384,9 @@ class AudioPlayerService extends ChangeNotifier {
     } catch (e) {
       _isBuffering = false;
       notifyListeners();
+      if (_queue.length > 1) {
+        playNext();
+      }
     }
   }
 
