@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song_model.dart';
 import 'download_service.dart';
+import 'user_taste_service.dart';
 
 class PlaylistService extends ChangeNotifier {
   static const String _favKey = 'soundvibe_favorites_v1';
@@ -83,14 +84,20 @@ class PlaylistService extends ChangeNotifier {
   }
 
   Future<void> toggleFavorite(SongModel song, {DownloadService? downloadService}) async {
+    final bool isFavNow;
     if (_favorites.containsKey(song.id)) {
       _favorites.remove(song.id);
+      isFavNow = false;
     } else {
       _favorites[song.id] = song;
+      isFavNow = true;
       if (_autoDownloadFavorites && downloadService != null && !downloadService.isDownloaded(song.id)) {
         downloadService.downloadSong(song);
       }
     }
+    // Update user taste profile with explicit favorite feedback
+    UserTasteService().recordFavorite(song, isFavorite: isFavNow);
+
     notifyListeners();
     await _persistFavorites();
   }

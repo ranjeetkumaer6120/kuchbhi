@@ -69,11 +69,11 @@ class AudioPlayerService extends ChangeNotifier {
 
   void _onTrackTransition(SongModel newSong) {
     if (_lastTrackForAnalytics != null && _lastTrackForAnalytics!.id != newSong.id) {
-      if (_lastTrackDurationPlayed.inSeconds <= 15) {
-        UserTasteService().recordSkip(_lastTrackForAnalytics!, playedSeconds: _lastTrackDurationPlayed.inSeconds);
-      } else if (_lastTrackDurationPlayed.inSeconds >= 30) {
-        UserTasteService().recordCompletion(_lastTrackForAnalytics!);
-      }
+      UserTasteService().recordPlaybackSession(
+        _lastTrackForAnalytics!,
+        playedSeconds: _lastTrackDurationPlayed.inSeconds,
+        totalDuration: _lastTrackForAnalytics!.duration,
+      );
     }
     _lastTrackForAnalytics = newSong;
     _lastTrackDurationPlayed = Duration.zero;
@@ -91,7 +91,11 @@ class AudioPlayerService extends ChangeNotifier {
       _isBuffering = state.processingState == ProcessingState.buffering;
       if (state.processingState == ProcessingState.completed) {
         if (_currentSong != null) {
-          UserTasteService().recordCompletion(_currentSong!);
+          UserTasteService().recordPlaybackSession(
+            _currentSong!,
+            playedSeconds: _currentSong!.duration > 0 ? _currentSong!.duration : 180,
+            totalDuration: _currentSong!.duration,
+          );
         }
         if (SleepTimerService.instance.isEndOfSongMode) {
           SleepTimerService.instance.onSongCompleted();

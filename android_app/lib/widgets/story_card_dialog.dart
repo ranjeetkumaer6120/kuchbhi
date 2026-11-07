@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/song_model.dart';
+import '../services/user_taste_service.dart';
 import '../theme/album_palette.dart';
 import '../theme/app_theme.dart';
 
@@ -44,6 +45,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
       await file.writeAsBytes(pngBytes);
 
       if (mounted) {
+        UserTasteService().recordShare(widget.song);
         // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(file.path)],
@@ -58,6 +60,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
   }
 
   void _fallbackShare() {
+    UserTasteService().recordShare(widget.song);
     // ignore: deprecated_member_use
     Share.share(
       'Listening to "${widget.song.title}" by ${widget.song.artist} on Kuchbhi App (320kbps Master HD)!',
