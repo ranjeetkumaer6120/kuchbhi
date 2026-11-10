@@ -661,6 +661,116 @@ class AudioPlayerService extends ChangeNotifier {
     notifyListeners();
   }
 
+  final List<SongModel> _carCatalogCache = [];
+
+  void updateCarCatalogCache(List<SongModel> songs) {
+    for (final s in songs) {
+      if (!_carCatalogCache.any((cached) => cached.id == s.id)) {
+        _carCatalogCache.add(s);
+      }
+    }
+  }
+
+  /// Handles car display browsing requests for Android Auto
+  Future<List<MediaItem>> getCarChildren(String parentMediaId) async {
+    // Top-Level Root for Android Auto / Car Display:
+    final cleanId = parentMediaId.toLowerCase().trim();
+    if (cleanId == 'root' || cleanId == '__root__' || cleanId == 'android_auto_root' || cleanId.contains('root')) {
+      return [
+        MediaItem(
+          id: 'car_queue',
+          title: 'Now Playing Queue',
+          displaySubtitle: '${_queue.length} songs ready',
+          playable: false,
+        ),
+        const MediaItem(
+          id: 'car_trending',
+          title: 'Trending Bollywood & Regional',
+          displaySubtitle: '320kbps Studio Master',
+          playable: false,
+        ),
+        const MediaItem(
+          id: 'car_recent',
+          title: 'Recently Played',
+          displaySubtitle: 'Jump back in',
+          playable: false,
+        ),
+      ];
+    }
+
+    if (cleanId == 'car_queue') {
+      if (_queue.isNotEmpty) {
+        return _queue.map((s) => _createMediaItem(s)).toList();
+      }
+      return [
+        const MediaItem(
+          id: 'empty_queue',
+          title: 'Queue is Empty',
+          displaySubtitle: 'Select any song from Trending',
+          playable: false,
+        ),
+      ];
+    }
+
+    if (cleanId == 'car_trending') {
+      if (_carCatalogCache.isEmpty) {
+        try {
+          final trending = await _apiService.searchSongs('Trending Hits', limit: 15);
+          if (trending.isNotEmpty) {
+            final deduped = ApiService.deduplicateByQuality(trending);
+            updateCarCatalogCache(deduped);
+          }
+        } catch (_) {}
+      }
+      if (_carCatalogCache.isNotEmpty) {
+        return _carCatalogCache.map((s) => _createMediaItem(s)).toList();
+      }
+    }
+
+    if (cleanId == 'car_recent') {
+      final pool = _carCatalogCache.isNotEmpty ? _carCatalogCache : _queue;
+      final topPlayed = UserTasteService().getPersonalizedTrending(pool, limit: 10);
+      if (topPlayed.isNotEmpty) {
+        return topPlayed.map((s) => _createMediaItem(s)).toList();
+      }
+    }
+
+    // Default fallback: return current queue
+    return _queue.map((s) => _createMediaItem(s)).toList();
+  }
+
+  /// Plays a track selected directly from the car touchscreen
+  Future<void> playSongById(String songId) async {
+    // 1. Search in current queue
+    final queueIndex = _queue.indexWhere((s) => s.id == songId);
+    if (queueIndex != -1) {
+      if (_player.audioSource != null && queueIndex < _queue.length) {
+        await _player.seek(Duration.zero, index: queueIndex);
+        await _player.play();
+        return;
+      } else {
+        await playSong(_queue[queueIndex], playlist: _queue);
+        return;
+      }
+    }
+
+    // 2. Search in car catalog cache
+    final found = _carCatalogCache.where((s) => s.id == songId).toList();
+    if (found.isNotEmpty) {
+      await playSong(found.first, playlist: _carCatalogCache);
+      return;
+    }
+
+    // 3. Search via API as fallback
+    try {
+      final results = await _apiService.searchAllSourcesAndRank(songId);
+      if (results.isNotEmpty) {
+        updateCarCatalogCache(results);
+        await playSong(results.first, playlist: results);
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _player.dispose();

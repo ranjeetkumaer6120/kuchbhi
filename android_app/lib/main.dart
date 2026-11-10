@@ -59,13 +59,40 @@ void main() async {
   final restored = await audioPlayerService.restorePlaybackSession(autoPreparePlayer: true);
 
   final apiService = ApiService();
+
+  // Wire up Android Auto Car Display Callbacks so the driver can browse & operate from car screen
+  JustAudioBackground.onGetChildren = (parentMediaId, [options]) async {
+    return audioPlayerService.getCarChildren(parentMediaId);
+  };
+
+  JustAudioBackground.onPlayFromMediaId = (mediaId, [extras]) async {
+    await audioPlayerService.playSongById(mediaId);
+  };
+
+  JustAudioBackground.onPlayFromSearch = (query, [extras]) async {
+    if (query.trim().isEmpty) return;
+    final results = await apiService.searchAllSourcesAndRank(query);
+    if (results.isNotEmpty) {
+      audioPlayerService.updateCarCatalogCache(results);
+      await audioPlayerService.playSong(results.first, playlist: results);
+    }
+  };
+
   if (!restored) {
     // Arm player with personalized trending hits so car displays (USB / Android Auto / Bluetooth) immediately have ready tracks
     apiService.searchSongs('Trending Hits', limit: 15).then((songs) {
       if (songs.isNotEmpty) {
         final deduplicated = ApiService.deduplicateByQuality(songs);
         final personalized = UserTasteService().getPersonalizedTrending(deduplicated, limit: 10);
+        audioPlayerService.updateCarCatalogCache(deduplicated);
         audioPlayerService.prefillInitialQueue(personalized);
+      }
+    }).catchError((_) {});
+  } else {
+    // Warm up car catalog cache in background
+    apiService.searchSongs('Trending Hits', limit: 15).then((songs) {
+      if (songs.isNotEmpty) {
+        audioPlayerService.updateCarCatalogCache(ApiService.deduplicateByQuality(songs));
       }
     }).catchError((_) {});
   }
