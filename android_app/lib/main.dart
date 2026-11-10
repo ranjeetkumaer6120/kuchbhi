@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'screens/home_screen.dart';
 import 'screens/library_screen.dart';
@@ -27,6 +28,14 @@ void main() async {
     androidStopForegroundOnPause: false,
     androidNotificationClickStartsActivity: true,
   );
+
+  // Configure system AudioSession for in-car USB audio routing (Android Auto / Bluetooth)
+  // Ensures USAGE_MEDIA + CONTENT_TYPE_MUSIC attributes and AUDIOFOCUS_GAIN
+  try {
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.music());
+    await session.setActive(true);
+  } catch (_) {}
 
   // Set system UI style (dark navigation & status bar)
   SystemChrome.setSystemUIOverlayStyle(

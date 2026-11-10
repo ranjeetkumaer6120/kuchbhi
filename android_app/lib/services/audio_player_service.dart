@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -81,9 +82,42 @@ class AudioPlayerService extends ChangeNotifier {
 
   AudioPlayerService() {
     _initStreams();
+    _initAudioSession();
   }
 
   bool _isRestoringSession = false;
+
+  Future<void> _initAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+
+      // Handle USB disconnect / headphone unplug (smooth auto-pause)
+      session.becomingNoisyEventStream.listen((_) {
+        if (_isPlaying) {
+          pause();
+        }
+      });
+
+      // Handle phone calls, GPS navigation ducking, and system interruptions
+      session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              _player.setVolume(0.3);
+              break;
+            case AudioInterruptionType.pause:
+            case AudioInterruptionType.unknown:
+              if (_isPlaying) {
+                pause();
+              }
+              break;
+          }
+        } else {
+          _player.setVolume(1.0);
+        }
+      });
+    } catch (_) {}
+  }
 
   void _initStreams() {
     _player.playbackEventStream.listen(
@@ -219,8 +253,14 @@ class AudioPlayerService extends ChangeNotifier {
       album: song.album,
       title: song.title,
       artist: song.artist,
+      duration: song.duration > 0 ? Duration(seconds: song.duration) : null,
       artUri: song.artworkUrl.isNotEmpty ? Uri.tryParse(song.artworkUrl) : null,
       playable: true,
+      extras: {
+        'source': song.source,
+        'language': song.language,
+        'streamUrl': song.streamUrl,
+      },
     );
   }
 
