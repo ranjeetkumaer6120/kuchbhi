@@ -45,6 +45,7 @@ void main() {
       expect(rootItems.any((item) => item.id == 'car_queue'), isTrue);
       expect(rootItems.any((item) => item.id == 'car_trending'), isTrue);
       expect(rootItems.any((item) => item.id == 'car_recent'), isTrue);
+      expect(rootItems.any((item) => item.id == 'car_search_discover'), isTrue);
       for (final item in rootItems) {
         expect(item.playable, isFalse);
       }

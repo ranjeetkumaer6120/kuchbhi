@@ -27,6 +27,12 @@ void main() async {
     androidNotificationOngoing: true,
     androidStopForegroundOnPause: false,
     androidNotificationClickStartsActivity: true,
+    androidBrowsableRootExtras: {
+      'android.media.browse.SEARCH_SUPPORTED': true,
+      'android.media.browse.CONTENT_STYLE_SUPPORTED': true,
+      'android.media.browse.CONTENT_STYLE_BROWSABLE_HINT': 1,
+      'android.media.browse.CONTENT_STYLE_PLAYABLE_HINT': 1,
+    },
   );
 
   // Configure system AudioSession for in-car USB audio routing (Android Auto / Bluetooth)
@@ -76,6 +82,10 @@ void main() async {
       audioPlayerService.updateCarCatalogCache(results);
       await audioPlayerService.playSong(results.first, playlist: results);
     }
+  };
+
+  JustAudioBackground.onSearch = (query, [extras]) async {
+    return await audioPlayerService.searchCarTracks(query);
   };
 
   if (!restored) {

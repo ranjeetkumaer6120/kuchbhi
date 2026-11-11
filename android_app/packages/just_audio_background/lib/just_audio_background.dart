@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
@@ -19,6 +20,8 @@ typedef CarPlayFromMediaIdCallback = Future<void> Function(
     String mediaId, [Map<String, dynamic>? extras]);
 typedef CarPlayFromSearchCallback = Future<void> Function(
     String query, [Map<String, dynamic>? extras]);
+typedef CarSearchCallback = Future<List<MediaItem>> Function(
+    String query, [Map<String, dynamic>? extras]);
 
 /// Provides the [init] method to initialise just_audio for background playback.
 class JustAudioBackground {
@@ -30,6 +33,9 @@ class JustAudioBackground {
 
   /// Callback when voice search is used from car steering wheel ("Hey Google, play X on kuchbhi")
   static CarPlayFromSearchCallback? onPlayFromSearch;
+
+  /// Callback when a search query is submitted from the car display (Android Auto in-app search)
+  static CarSearchCallback? onSearch;
   /// Initialise just_audio for background playback. This should be called from
   /// your app's `main` method. e.g.:
   ///
@@ -634,6 +640,13 @@ class _PlayerAudioHandler extends BaseAudioHandler
   @override
   Future<List<MediaItem>> getChildren(String parentMediaId,
       [Map<String, dynamic>? options]) async {
+    // When car infotainment connects and queries browse tree, activate audio session immediately
+    // so that an already-playing song routes to car speakers without needing another app
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (_) {}
+
     if (JustAudioBackground.onGetChildren != null) {
       try {
         final custom = await JustAudioBackground.onGetChildren!(parentMediaId, options);
@@ -660,6 +673,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> playFromMediaId(String mediaId, [Map<String, dynamic>? extras]) async {
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (_) {}
     if (JustAudioBackground.onPlayFromMediaId != null) {
       try {
         await JustAudioBackground.onPlayFromMediaId!(mediaId, extras);
@@ -680,11 +697,26 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> playFromSearch(String query, [Map<String, dynamic>? extras]) async {
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (_) {}
     if (JustAudioBackground.onPlayFromSearch != null) {
       try {
         await JustAudioBackground.onPlayFromSearch!(query, extras);
       } catch (_) {}
     }
+  }
+
+  @override
+  Future<List<MediaItem>> search(String query, [Map<String, dynamic>? extras]) async {
+    if (JustAudioBackground.onSearch != null) {
+      try {
+        final results = await JustAudioBackground.onSearch!(query, extras);
+        if (results.isNotEmpty) return results;
+      } catch (_) {}
+    }
+    return super.search(query, extras);
   }
 
   @override

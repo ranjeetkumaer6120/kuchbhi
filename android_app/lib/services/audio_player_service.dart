@@ -90,6 +90,26 @@ class AudioPlayerService extends ChangeNotifier {
   Future<void> _initAudioSession() async {
     try {
       final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+
+      // Ensure ExoPlayer AudioAttributes are USAGE_MEDIA and CONTENT_TYPE_MUSIC
+      _player.setAndroidAudioAttributes(
+        const AndroidAudioAttributes(
+          contentType: AndroidAudioContentType.music,
+          flags: AndroidAudioFlags.none,
+          usage: AndroidAudioUsage.media,
+        ),
+      );
+
+      // Handle USB connect/disconnect and audio output route changes (Android Auto / Bluetooth / USB)
+      session.devicesChangedEventStream.listen((_) async {
+        try {
+          if (_isPlaying) {
+            // Re-assert audio focus on the new car/USB output device so sound routes immediately
+            await session.setActive(true);
+          }
+        } catch (_) {}
+      });
 
       // Handle USB disconnect / headphone unplug (smooth auto-pause)
       session.becomingNoisyEventStream.listen((_) {
@@ -266,6 +286,10 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> playSong(SongModel song, {List<SongModel>? playlist}) async {
     try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (_) {}
+    try {
       _currentLanguageLock = song.language.toLowerCase().trim();
 
       if (playlist != null && playlist.isNotEmpty) {
@@ -437,6 +461,10 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> play() async {
     if (_currentSong == null) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (_) {}
     if (_player.audioSource == null) {
       await playSong(_currentSong!, playlist: _queue);
       if (_position > Duration.zero) {
@@ -695,6 +723,12 @@ class AudioPlayerService extends ChangeNotifier {
           displaySubtitle: 'Jump back in',
           playable: false,
         ),
+        const MediaItem(
+          id: 'car_search_discover',
+          title: 'Search & Top Hits',
+          displaySubtitle: 'All-Time Bollywood Hits',
+          playable: false,
+        ),
       ];
     }
 
@@ -735,12 +769,28 @@ class AudioPlayerService extends ChangeNotifier {
       }
     }
 
+    if (cleanId == 'car_search_discover') {
+      try {
+        final hits = await _apiService.searchSongs('Bollywood Evergreen Hits', limit: 15);
+        if (hits.isNotEmpty) {
+          updateCarCatalogCache(hits);
+          return hits.map((s) => _createMediaItem(s)).toList();
+        }
+      } catch (_) {}
+      return _queue.map((s) => _createMediaItem(s)).toList();
+    }
+
     // Default fallback: return current queue
     return _queue.map((s) => _createMediaItem(s)).toList();
   }
 
   /// Plays a track selected directly from the car touchscreen
   Future<void> playSongById(String songId) async {
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (_) {}
+
     // 1. Search in current queue
     final queueIndex = _queue.indexWhere((s) => s.id == songId);
     if (queueIndex != -1) {
@@ -769,6 +819,19 @@ class AudioPlayerService extends ChangeNotifier {
         await playSong(results.first, playlist: results);
       }
     } catch (_) {}
+  }
+
+  /// Performs search requested from the car screen or voice input
+  Future<List<MediaItem>> searchCarTracks(String query) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      final results = await _apiService.searchAllSourcesAndRank(query);
+      if (results.isNotEmpty) {
+        updateCarCatalogCache(results);
+        return results.map((s) => _createMediaItem(s)).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   @override
