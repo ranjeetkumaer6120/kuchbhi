@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/download_service.dart';
 import '../services/playlist_service.dart';
+import '../services/spotify_service.dart';
 import '../services/user_taste_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/language_filter_bar.dart';
@@ -471,11 +472,205 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  void _showSpotifyConfigDialog() {
+    final clientIdCtrl = TextEditingController(text: SpotifyService.instance.clientId ?? '');
+    final clientSecretCtrl = TextEditingController(text: SpotifyService.instance.clientSecret ?? '');
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isConfigured = SpotifyService.instance.isConfigured;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Spotify Integration',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isConfigured
+                              ? AppTheme.spotifyGreen.withValues(alpha: 0.15)
+                              : Colors.white10,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isConfigured
+                                ? AppTheme.spotifyGreen
+                                : Colors.white24,
+                          ),
+                        ),
+                        child: Text(
+                          isConfigured ? 'Connected' : 'Not Connected',
+                          style: TextStyle(
+                            color: isConfigured ? AppTheme.spotifyGreen : Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Connect Spotify Developer keys to unlock 100M+ global songs and curated official charts. Playback streams in full 320kbps Studio Master.',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: clientIdCtrl,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Spotify Client ID',
+                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      filled: true,
+                      fillColor: AppTheme.surfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: clientSecretCtrl,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Spotify Client Secret',
+                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      filled: true,
+                      fillColor: AppTheme.surfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      if (isConfigured) ...[
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(color: Colors.redAccent),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () async {
+                              await SpotifyService.instance.clearCredentials();
+                              setModalState(() {});
+                              if (mounted) setState(() {});
+                            },
+                            child: const Text('Disconnect'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.spotifyGreen,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (clientIdCtrl.text.trim().isEmpty ||
+                                      clientSecretCtrl.text.trim().isEmpty) {
+                                    return;
+                                  }
+                                  setModalState(() => isSaving = true);
+                                  await SpotifyService.instance.setCredentials(
+                                    clientIdCtrl.text.trim(),
+                                    clientSecretCtrl.text.trim(),
+                                  );
+                                  final token = await SpotifyService.instance.getAccessToken();
+                                  setModalState(() => isSaving = false);
+                                  if (mounted) {
+                                    setState(() {});
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(token != null
+                                            ? 'Spotify Connected Successfully!'
+                                            : 'Credentials saved (Verify keys if search fails)'),
+                                        backgroundColor: AppTheme.surfaceLight,
+                                      ),
+                                    );
+                                  }
+                                },
+                          child: Text(
+                            isSaving ? 'Verifying...' : 'Save & Connect',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Center(
+                    child: Text(
+                      'Get free keys at: developer.spotify.com/dashboard',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search'),
+        actions: [
+          IconButton(
+            tooltip: 'Spotify Catalog Settings',
+            icon: Icon(
+              Icons.graphic_eq_rounded,
+              color: SpotifyService.instance.isConfigured
+                  ? AppTheme.spotifyGreen
+                  : AppTheme.textSecondary,
+            ),
+            onPressed: _showSpotifyConfigDialog,
+          ),
+        ],
       ),
       body: Column(
         children: [

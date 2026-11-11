@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/lyrics_model.dart';
 import '../models/song_model.dart';
+import 'spotify_service.dart';
 
 class ApiService {
   final YoutubeExplode _yt = YoutubeExplode();
@@ -262,6 +263,13 @@ class ApiService {
         ? '$query ${language.trim().toLowerCase()}'
         : query;
 
+    List<SongModel> spotifyTracks = [];
+    if (SpotifyService.instance.isConfigured) {
+      try {
+        spotifyTracks = await SpotifyService.instance.searchTracks(query, limit: 10);
+      } catch (_) {}
+    }
+
     final results = await Future.wait([
       searchSongs(query, language: language),
       searchYouTube(ytQuery),
@@ -271,6 +279,8 @@ class ApiService {
     final ytList = results[1];
 
     final combined = <SongModel>[];
+    // Official Spotify metadata hits (if configured)
+    combined.addAll(spotifyTracks);
     // Full 320kbps CD/Master quality tracks from JioSaavn
     combined.addAll(saavnList);
     // Full length ad-free audio streams from YouTube

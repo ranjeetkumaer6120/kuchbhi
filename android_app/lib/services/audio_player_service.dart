@@ -26,6 +26,7 @@ class AudioPlayerService extends ChangeNotifier {
   String? _currentLanguageLock;
   double _playbackSpeed = 1.0;
   bool _isLoFiMode = false;
+  String _activeDeviceName = 'This Phone';
 
   SongModel? get currentSong => _currentSong;
   List<SongModel> get queue => _queue;
@@ -39,6 +40,7 @@ class AudioPlayerService extends ChangeNotifier {
   String? get currentLanguageLock => _currentLanguageLock;
   double get playbackSpeed => _playbackSpeed;
   bool get isLoFiMode => _isLoFiMode;
+  String get activeDeviceName => _activeDeviceName;
 
   void setLanguageLock(String? language) {
     _currentLanguageLock = language?.trim().toLowerCase();
@@ -101,9 +103,12 @@ class AudioPlayerService extends ChangeNotifier {
         ),
       );
 
+      await _updateConnectedDeviceName(session);
+
       // Handle USB connect/disconnect and audio output route changes (Android Auto / Bluetooth / USB)
       session.devicesChangedEventStream.listen((_) async {
         try {
+          await _updateConnectedDeviceName(session);
           if (_isPlaying) {
             // Re-assert audio focus on the new car/USB output device so sound routes immediately
             await session.setActive(true);
@@ -136,6 +141,34 @@ class AudioPlayerService extends ChangeNotifier {
           _player.setVolume(1.0);
         }
       });
+    } catch (_) {}
+  }
+
+  Future<void> _updateConnectedDeviceName(AudioSession session) async {
+    try {
+      final devices = await session.getDevices();
+      final outputDevices = devices.where((d) => d.isOutput).toList();
+      if (outputDevices.any((d) => d.type == AudioDeviceType.carAudio)) {
+        _activeDeviceName = 'Car Audio';
+      } else if (outputDevices.any((d) => d.type == AudioDeviceType.usbAudio)) {
+        _activeDeviceName = 'Car Display / USB';
+      } else if (outputDevices.any((d) =>
+          d.type == AudioDeviceType.bluetoothA2dp ||
+          d.type == AudioDeviceType.bluetoothLe ||
+          d.type == AudioDeviceType.bluetoothSco)) {
+        final bt = outputDevices.firstWhere((d) =>
+            d.type == AudioDeviceType.bluetoothA2dp ||
+            d.type == AudioDeviceType.bluetoothLe ||
+            d.type == AudioDeviceType.bluetoothSco);
+        _activeDeviceName = bt.name.trim().isNotEmpty ? bt.name.trim() : 'Bluetooth Audio';
+      } else if (outputDevices.any((d) =>
+          d.type == AudioDeviceType.wiredHeadset ||
+          d.type == AudioDeviceType.wiredHeadphones)) {
+        _activeDeviceName = 'Headphones';
+      } else {
+        _activeDeviceName = 'This Phone';
+      }
+      notifyListeners();
     } catch (_) {}
   }
 
@@ -186,25 +219,34 @@ class AudioPlayerService extends ChangeNotifier {
           UserTasteService().recordPlay(_currentSong!);
         }
 
-        // Resolve YouTube stream on demand if entering a track without pre-resolved URL
-        if (_currentSong!.source == 'youtube' &&
+        // Resolve YouTube or Spotify stream on demand if entering a track without pre-resolved URL
+        if ((_currentSong!.source == 'youtube' || _currentSong!.source == 'spotify') &&
             (_currentSong!.streamUrl.isEmpty || _currentSong!.streamUrl.contains('data:audio') || _currentSong!.streamUrl.contains('kuchbhi.app'))) {
           String? directUrl;
+          final cleanTitle = ApiService.normalizeSongTitle(_currentSong!.title);
+          final cleanArtist = ApiService.normalizeArtist(_currentSong!.artist);
+          final fallbackQuery = cleanArtist.isNotEmpty && cleanArtist != 'unknown' && !cleanArtist.contains('youtube')
+              ? '$cleanTitle $cleanArtist'
+              : cleanTitle;
+
+          // 1. For Spotify / unlinked tracks, try 320kbps JioSaavn first
           try {
-            directUrl = await _apiService.getYouTubeAudioStream(_currentSong!.id);
+            final saavnMatches = await _apiService.searchSongs(fallbackQuery, limit: 3, language: _currentSong!.language);
+            if (saavnMatches.isNotEmpty && saavnMatches.first.streamUrl.isNotEmpty) {
+              directUrl = saavnMatches.first.streamUrl;
+            }
           } catch (_) {}
 
-          // Automatic 320kbps JioSaavn fallback if YouTube stream extraction fails
+          // 2. Fallback to YouTube stream extraction
           if (directUrl == null || directUrl.isEmpty) {
             try {
-              final cleanTitle = ApiService.normalizeSongTitle(_currentSong!.title);
-              final cleanArtist = ApiService.normalizeArtist(_currentSong!.artist);
-              final fallbackQuery = cleanArtist.isNotEmpty && cleanArtist != 'unknown' && !cleanArtist.contains('youtube')
-                  ? '$cleanTitle $cleanArtist'
-                  : cleanTitle;
-              final saavnMatches = await _apiService.searchSongs(fallbackQuery, limit: 3, language: _currentSong!.language);
-              if (saavnMatches.isNotEmpty && saavnMatches.first.streamUrl.isNotEmpty) {
-                directUrl = saavnMatches.first.streamUrl;
+              if (_currentSong!.source == 'youtube') {
+                directUrl = await _apiService.getYouTubeAudioStream(_currentSong!.id);
+              } else {
+                final ytMatches = await _apiService.searchYouTube(fallbackQuery);
+                if (ytMatches.isNotEmpty) {
+                  directUrl = await _apiService.getYouTubeAudioStream(ytMatches.first.id);
+                }
               }
             } catch (_) {}
           }
@@ -380,16 +422,40 @@ class AudioPlayerService extends ChangeNotifier {
             }
           } catch (_) {}
         }
-      } else if (song.source == 'itunes' || song.streamUrl.contains('itunes.apple.com')) {
-        final fullSaavn = await _apiService.searchSongs('${song.title} ${song.artist}', language: song.language);
-        if (fullSaavn.isNotEmpty && fullSaavn.first.streamUrl.isNotEmpty) {
+      } else if (song.source == 'spotify' || song.source == 'itunes' || song.streamUrl.contains('itunes.apple.com') || song.streamUrl.isEmpty) {
+        final cleanTitle = ApiService.normalizeSongTitle(song.title);
+        final cleanArtist = ApiService.normalizeArtist(song.artist);
+        final query = cleanArtist.isNotEmpty && cleanArtist != 'unknown' && !cleanArtist.contains('youtube')
+            ? '$cleanTitle $cleanArtist'
+            : cleanTitle;
+        String? directUrl;
+
+        // 1. Try JioSaavn for 320kbps Studio Master
+        try {
+          final fullSaavn = await _apiService.searchSongs(query, language: song.language);
+          if (fullSaavn.isNotEmpty && fullSaavn.first.streamUrl.isNotEmpty) {
+            directUrl = fullSaavn.first.streamUrl;
+          }
+        } catch (_) {}
+
+        // 2. Try YouTube as fallback
+        if (directUrl == null || directUrl.isEmpty) {
+          try {
+            final ytMatches = await _apiService.searchYouTube(query);
+            if (ytMatches.isNotEmpty) {
+              directUrl = await _apiService.getYouTubeAudioStream(ytMatches.first.id);
+            }
+          } catch (_) {}
+        }
+
+        if (directUrl != null && directUrl.isNotEmpty) {
           song = SongModel(
             id: song.id,
             title: song.title,
             artist: song.artist,
             album: song.album,
             duration: song.duration,
-            streamUrl: fullSaavn.first.streamUrl,
+            streamUrl: directUrl,
             artworkUrl: song.artworkUrl,
             source: song.source,
             qualityBadge: song.qualityBadge,

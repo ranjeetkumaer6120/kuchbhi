@@ -66,6 +66,115 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
+  void _showQueueModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.35,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (sheetCtx, scrollController) {
+            final queue = playerService.queue;
+            final current = playerService.currentSong;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Playback Queue',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      Text(
+                        '${queue.length} tracks',
+                        style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: AppTheme.border, height: 1),
+                Expanded(
+                  child: queue.isEmpty
+                      ? const Center(
+                          child: Text('Queue is empty', style: TextStyle(color: AppTheme.textSecondary)),
+                        )
+                      : ListView.builder(
+                          controller: scrollController,
+                          itemCount: queue.length,
+                          itemBuilder: (itemCtx, index) {
+                            final item = queue[index];
+                            final isCurrent = item.id == current?.id;
+                            return ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: item.artworkUrl.isNotEmpty
+                                      ? CachedNetworkImage(
+                                          imageUrl: item.artworkUrl,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, _, _) => Container(color: AppTheme.surfaceLight),
+                                        )
+                                      : Container(color: AppTheme.surfaceLight),
+                                ),
+                              ),
+                              title: Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                  color: isCurrent ? AppTheme.spotifyGreen : Colors.white,
+                                ),
+                              ),
+                              subtitle: Text(
+                                item.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                              ),
+                              trailing: isCurrent
+                                  ? const Icon(Icons.equalizer_rounded, color: AppTheme.spotifyGreen, size: 20)
+                                  : null,
+                              onTap: () {
+                                playerService.playSong(item, playlist: queue);
+                                Navigator.pop(ctx);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showAddToFolder(BuildContext context, SongModel song) {
     final folders = playlistService.folderNames;
     final folderController = TextEditingController();
@@ -492,20 +601,40 @@ class PlayerScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               child: Column(
                 children: [
-                  // Header
+                  // Spotify Header: Playing From & Actions
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 36, color: Colors.white),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 34, color: Colors.white),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
-                      Container(
-                        width: 38,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'PLAYING FROM',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              song.album.isNotEmpty ? song.album : 'kuchbhi Music',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       Row(
@@ -513,12 +642,7 @@ class PlayerScreen extends StatelessWidget {
                         children: [
                           _buildSleepTimerButton(context),
                           IconButton(
-                            icon: const Icon(Icons.ios_share_rounded, size: 22, color: Colors.white70),
-                            tooltip: 'Share Story Card',
-                            onPressed: () => _showStoryCardModal(context, song),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.more_horiz_rounded, size: 26, color: Colors.white),
+                            icon: const Icon(Icons.more_vert_rounded, size: 24, color: Colors.white),
                             onPressed: () => _showAddToFolder(context, song),
                           ),
                         ],
@@ -547,21 +671,21 @@ class PlayerScreen extends StatelessWidget {
                       duration: const Duration(milliseconds: 350),
                       curve: Curves.easeOutCubic,
                       child: Container(
-                        width: 290,
-                        height: 290,
+                        width: 310,
+                        height: 310,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              blurRadius: 36,
-                              spreadRadius: 4,
-                              offset: const Offset(0, 16),
+                              color: Colors.black.withValues(alpha: 0.55),
+                              blurRadius: 32,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 14),
                             ),
                           ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(12),
                           child: song.artworkUrl.isNotEmpty
                               ? CachedNetworkImage(
                                   imageUrl: song.artworkUrl,
@@ -694,7 +818,7 @@ class PlayerScreen extends StatelessWidget {
                       IconButton(
                         icon: Icon(
                           Icons.shuffle_rounded,
-                          color: playerService.isShuffle ? AppTheme.appleRed : Colors.white.withValues(alpha: 0.6),
+                          color: playerService.isShuffle ? AppTheme.spotifyGreen : Colors.white.withValues(alpha: 0.6),
                           size: 24,
                         ),
                         onPressed: () => playerService.toggleShuffle(),
@@ -727,7 +851,7 @@ class PlayerScreen extends StatelessWidget {
                       IconButton(
                         icon: Icon(
                           Icons.repeat_rounded,
-                          color: playerService.isLoop ? AppTheme.appleRed : Colors.white.withValues(alpha: 0.6),
+                          color: playerService.isLoop ? AppTheme.spotifyGreen : Colors.white.withValues(alpha: 0.6),
                           size: 24,
                         ),
                         onPressed: () => playerService.toggleLoop(),
@@ -818,21 +942,76 @@ class PlayerScreen extends StatelessWidget {
                         ),
                     ],
                   ),
+                  // Spotify Device Bar & Bottom Actions (Share & Queue)
                   Padding(
-                    padding: const EdgeInsets.only(top: 14, bottom: 4),
-                    child: Center(
-                      child: Text(
-                        'kuchbhi • Developed by Ranjeet Kumar',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.white.withValues(alpha: 0.45),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Left: Connected device (Phone / Car Display / Bluetooth)
+                        ListenableBuilder(
+                          listenable: playerService,
+                          builder: (context, _) {
+                            final device = playerService.activeDeviceName;
+                            final isCarOrBt = device.contains('Car') ||
+                                device.contains('USB') ||
+                                device.contains('Bluetooth');
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isCarOrBt ? Icons.devices_rounded : Icons.speaker_rounded,
+                                  size: 16,
+                                  color: AppTheme.spotifyGreen,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  device,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.spotifyGreen,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
+
+                        // Right: Share Story Card + Queue
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.ios_share_rounded, size: 20, color: Colors.white70),
+                              tooltip: 'Share Card',
+                              onPressed: () => _showStoryCardModal(context, song),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.queue_music_rounded, size: 22, color: Colors.white70),
+                              tooltip: 'Queue',
+                              onPressed: () => _showQueueModal(context),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Credit
+                  Center(
+                    child: Text(
+                      'kuchbhi • Developed by Ranjeet Kumar',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.4,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),

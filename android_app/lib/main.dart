@@ -10,12 +10,14 @@ import 'services/api_service.dart';
 import 'services/audio_player_service.dart';
 import 'services/download_service.dart';
 import 'services/playlist_service.dart';
+import 'services/spotify_service.dart';
 import 'services/user_taste_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/mini_player_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SpotifyService.instance.init();
 
   // Initialize Android status bar media notification for background playback
   await JustAudioBackground.init(

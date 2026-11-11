@@ -5,11 +5,11 @@ void main() {
   test('youtube_explode_dart extracts working direct audio stream', () async {
     final yt = YoutubeExplode();
     try {
-      final results = await yt.search.search('Kesariya song');
+      final results = await yt.search.search('Kesariya song').timeout(const Duration(seconds: 15));
       if (results.isNotEmpty) {
         final first = results.first;
         expect(first.title, isNotEmpty);
-        final manifest = await yt.videos.streamsClient.getManifest(first.id);
+        final manifest = await yt.videos.streamsClient.getManifest(first.id).timeout(const Duration(seconds: 10));
         final audioStream = manifest.audioOnly.withHighestBitrate();
         expect(audioStream.url.toString(), contains('googlevideo.com'));
       }
@@ -18,5 +18,5 @@ void main() {
     } finally {
       yt.close();
     }
-  });
+  }, timeout: const Timeout(Duration(seconds: 35)));
 }
